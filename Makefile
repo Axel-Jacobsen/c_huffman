@@ -1,2 +1,2 @@
 build:
-	@clang -Wall -o chuff chuff.c
+	@clang -Wall -o huff chuff.c
