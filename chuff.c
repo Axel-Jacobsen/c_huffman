@@ -8,7 +8,6 @@
 
 #define TOKEN_LEN 8 // right now only a token len of 8 bits
 #define TOKEN_SET_LEN 1 << TOKEN_LEN
-#define COUNT 10
 
 typedef _Bool bool;
 
@@ -169,12 +168,14 @@ void padding (int n)
 
 void print2DUtil(Node* root, int space)
 {
+	int count = 10;
+
 	// Base case
 	if (root == NULL)
 		return;
 
 	// Increase distance between levels
-	space += COUNT;
+	space += count;
 
 	// Process right child first
 	print2DUtil(root->r, space);
@@ -182,7 +183,7 @@ void print2DUtil(Node* root, int space)
 	// Print current node after space
 	// count
 	printf("\n");
-	for (int i = COUNT; i < space; i++)
+	for (int i = count; i < space; i++)
 		printf(" ");
 
 	char c[4] = "   ";
