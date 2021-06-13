@@ -177,6 +177,15 @@ Node* build_tree(FILE* f, uint64_t* freq_arr)
 	return fin_node;
 }
 
+void free_tree(Node* N)
+{
+	if (N == NULL)
+		return;
+	free_tree(N->r);
+	free_tree(N->l);
+	free(N);
+}
+
 void padding (int n)
 {
 	int i;
@@ -258,6 +267,7 @@ int main(int argc, char *argv[])
 	// Build Huffman Tree with Frequencies
 	Node* tree = build_tree(infile, cf_arr);
 	print2DUtil(tree, 0);
+	free_tree(tree);
 
 	// Write file with Huffman Tree Symbols
 	free(cf_arr); cf_arr = NULL;
