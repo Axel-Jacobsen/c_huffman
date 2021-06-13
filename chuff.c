@@ -22,28 +22,17 @@ typedef struct Node {
 
 // ------------------------------
 
-long get_file_len(FILE* f)
+uint64_t* calculate_char_freqs(FILE* f)
 {
-	fseek(f, 0L, SEEK_END);
-	long len = ftell(f);
+	uint64_t* freq_arr = (uint64_t*) calloc((size_t) TOKEN_SET_LEN, sizeof(uint64_t));
+
+	if (!freq_arr)
+	{
+		fprintf(stderr, "char frequency allocation failed\n");
+		exit(-1);
+	}
+
 	fseek(f, 0L, SEEK_SET);
-	return len;
-}
-
-/* Allocate enough memory for character frequencies
-*/
-void* init_char_freq_arr()
-{
-	void* cf_arr = calloc((size_t) TOKEN_SET_LEN, sizeof(uint64_t));
-	if (cf_arr)
-		return cf_arr;
-	return NULL;
-}
-
-void calculate_char_freqs(FILE* f, uint64_t* freq_arr)
-{
-	if (ftell(f) != 0)
-		fseek(f, 0L, SEEK_SET);
 
 	int c;
 	while ((c = fgetc(f)) != EOF)
@@ -51,8 +40,9 @@ void calculate_char_freqs(FILE* f, uint64_t* freq_arr)
 		++freq_arr[c];
 	}
 	fseek(f, 0L, SEEK_SET);
-}
 
+	return freq_arr;
+}
 
 uint64_t get_num_chars(uint64_t* freq_arr)
 {
@@ -85,17 +75,6 @@ Node** init_node_arr_from_chars(uint64_t* freq_arr, uint64_t num_chars)
 	Node** node_arr = (Node**) calloc(num_chars, sizeof(Node*));
 	for (uint64_t i = 0; i < TOKEN_SET_LEN; i++) {
 		if (freq_arr[i] != 0) {
-			char c[3] = "  ";
-			if ((char) i == '\n')
-			{
-				strcpy(c, "\\n");
-			}
-			else if ((char) i == '\t'){
-				strcpy(c, "\\t");
-			}else {
-				c[1] = (char)i;
-			}
-			printf("char %s\n", c);
 			node_arr[j] = init_node(NULL, NULL, i, freq_arr[i], 1);
 			++j;
 		}
@@ -123,7 +102,6 @@ void swap_idxs(Node** node_arr, uint64_t lidx, uint64_t slidx, uint64_t max_idx)
 	}
 }
 
-
 Node** get_min_two(Node** node_arr, uint64_t max_idx)
 {
 	uint64_t lowest = UINT_MAX;
@@ -133,7 +111,6 @@ Node** get_min_two(Node** node_arr, uint64_t max_idx)
 	Node** lowest_pair = (Node**) calloc(2, sizeof(Node*));
 
 	for (unsigned int i = 0; i < max_idx; i++)
-	{
 		if (node_arr[i]->count < lowest)
 		{
 			lowest = node_arr[i]->count;
@@ -146,7 +123,6 @@ Node** get_min_two(Node** node_arr, uint64_t max_idx)
 			lowest_pair[1] = node_arr[i];
 			slidx = i;
 		}
-	}
 	swap_idxs(node_arr, lidx, slidx, max_idx);
 	return lowest_pair;
 }
@@ -188,9 +164,7 @@ void free_tree(Node* N)
 
 void padding (int n)
 {
-	int i;
-	for ( i = 0; i < n; i++ )
-		putchar ('\t');
+	for (int i = 0; i < n; i++) putchar('\t');
 }
 
 void print2DUtil(Node* root, int space)
@@ -211,18 +185,16 @@ void print2DUtil(Node* root, int space)
 	for (int i = COUNT; i < space; i++)
 		printf(" ");
 
-		char c[4] = "   ";
-		if (root->token == '\n')
-		{
-			strcpy(c, "\\n");
-		}
-		else if (root->token == '\t'){
-			strcpy(c, "\\t");
-		}else if (root->token == ' '){
-			strcpy(c, "' '");
-		}else {
-			c[1] = root->token;
-		}
+	char c[4] = "   ";
+	if (root->token == '\n') {
+		strcpy(c, "\\n");
+	} else if (root->token == '\t') {
+		strcpy(c, "\\t");
+	} else if (root->token == ' ') {
+		strcpy(c, "' '");
+	} else {
+		c[1] = root->token;
+	}
 	printf("%s: %d\n", c, root->count);
 
 	// Process left child
@@ -255,21 +227,15 @@ int main(int argc, char *argv[])
 	//  - for char in file:
 	//    - convert token to int/long/etc
 	//    - cf_arr[token]++
-	uint64_t* cf_arr = init_char_freq_arr();
-	if (!cf_arr)
-	{
-		fprintf(stderr, "char frequency allocation failed\n");
-		exit(-1);
-	}
 
-	calculate_char_freqs(infile, cf_arr);
+	uint64_t* freq_arr = calculate_char_freqs(infile);
 
 	// Build Huffman Tree with Frequencies
-	Node* tree = build_tree(infile, cf_arr);
+	Node* tree = build_tree(infile, freq_arr);
 	print2DUtil(tree, 0);
 	free_tree(tree);
 
 	// Write file with Huffman Tree Symbols
-	free(cf_arr); cf_arr = NULL;
+	free(freq_arr);
 	fclose(infile);
 }
