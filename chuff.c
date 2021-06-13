@@ -17,7 +17,6 @@ typedef struct Node {
 	unsigned char token;
 	unsigned int count;
 	bool is_leaf;
-	bool in_tree;
 } Node;
 
 
@@ -64,7 +63,7 @@ uint64_t get_num_chars(uint64_t* freq_arr)
 	return num_chars;
 }
 
-Node* init_node(Node* n1, Node* n2, unsigned char tkn, unsigned int cnt, bool is_leaf, bool in_tree)
+Node* init_node(Node* n1, Node* n2, unsigned char tkn, unsigned int cnt, bool is_leaf)
 {
 	Node* N = (Node*) malloc(sizeof(Node));
 	if (N == NULL)
@@ -77,7 +76,6 @@ Node* init_node(Node* n1, Node* n2, unsigned char tkn, unsigned int cnt, bool is
 	N->token = tkn;
 	N->count = cnt;
 	N->is_leaf = is_leaf;
-	N->in_tree = in_tree;
 	return N;
 }
 
@@ -87,7 +85,18 @@ Node** init_node_arr_from_chars(uint64_t* freq_arr, uint64_t num_chars)
 	Node** node_arr = (Node**) calloc(num_chars, sizeof(Node*));
 	for (uint64_t i = 0; i < TOKEN_SET_LEN; i++) {
 		if (freq_arr[i] != 0) {
-			node_arr[j] = init_node(NULL, NULL, i, freq_arr[i], 1, 0);
+			char c[3] = "  ";
+			if ((char) i == '\n')
+			{
+				strcpy(c, "\\n");
+			}
+			else if ((char) i == '\t'){
+				strcpy(c, "\\t");
+			}else {
+				c[1] = (char)i;
+			}
+			printf("char %s\n", c);
+			node_arr[j] = init_node(NULL, NULL, i, freq_arr[i], 1);
 			++j;
 		}
 	}
@@ -157,7 +166,7 @@ Node* build_tree(FILE* f, uint64_t* freq_arr)
 		Node** min_two = get_min_two(node_arr, max_idx);
 		// Create node w/ the two lowest as children
 		unsigned int count = min_two[0]->count + min_two[1]->count;
-		Node* N = init_node(min_two[0], min_two[1], 0x00, count, 0, 1);
+		Node* N = init_node(min_two[0], min_two[1], 0x00, count, 0);
 		free(min_two);
 		// remove the original two lowest value nodes, insert new node, decrease len number
 		// we can remove the nodes since we can free the node mem in the tree, not in the arr
@@ -177,25 +186,38 @@ void padding (int n)
 
 void print2DUtil(Node* root, int space)
 {
-    // Base case
-    if (root == NULL)
-        return;
-  
-    // Increase distance between levels
-    space += COUNT;
-  
-    // Process right child first
-    print2DUtil(root->r, space);
-  
-    // Print current node after space
-    // count
-    printf("\n");
-    for (int i = COUNT; i < space; i++)
-        printf(" ");
-    printf("%c: %d\n", root->token, root->count);
-  
-    // Process left child
-    print2DUtil(root->l, space);
+	// Base case
+	if (root == NULL)
+		return;
+
+	// Increase distance between levels
+	space += COUNT;
+
+	// Process right child first
+	print2DUtil(root->r, space);
+
+	// Print current node after space
+	// count
+	printf("\n");
+	for (int i = COUNT; i < space; i++)
+		printf(" ");
+
+		char c[4] = "   ";
+		if (root->token == '\n')
+		{
+			strcpy(c, "\\n");
+		}
+		else if (root->token == '\t'){
+			strcpy(c, "\\t");
+		}else if (root->token == ' '){
+			strcpy(c, "' '");
+		}else {
+			c[1] = root->token;
+		}
+	printf("%s: %d\n", c, root->count);
+
+	// Process left child
+	print2DUtil(root->l, space);
 }
 
 int main(int argc, char *argv[])
@@ -236,6 +258,7 @@ int main(int argc, char *argv[])
 	// Build Huffman Tree with Frequencies
 	Node* tree = build_tree(infile, cf_arr);
 	print2DUtil(tree, 0);
+
 	// Write file with Huffman Tree Symbols
 	free(cf_arr); cf_arr = NULL;
 	fclose(infile);
