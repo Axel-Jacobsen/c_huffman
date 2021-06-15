@@ -61,7 +61,7 @@ void printbe(uint64_t v, uint64_t max_idx) {
 
 void printle(uint64_t v, uint64_t max_idx) {
 	for (uint64_t j = max_idx; j > 0; j--) {
-		uint64_t shift = 1 << j;
+		uint64_t shift = 1 << (j - 1);
 		printf("%d", (bool)((v & shift) == shift));
 	}
 }

@@ -176,7 +176,7 @@ void _traverse(Node* N, CharCode* cur_cmprs, CharCode** write_table) {
 
 CharCode** traverse_tree(Node* N) {
 	CharCode** md_arr = (CharCode**) calloc(TOKEN_SET_LEN, sizeof(CharCode*));
-	CharCode* first_charcode = init_charcode(0, 1, 0);
+	CharCode* first_charcode = init_charcode(0, 0, 0);
 	_traverse(N, first_charcode, md_arr);
 	return md_arr;
 }
