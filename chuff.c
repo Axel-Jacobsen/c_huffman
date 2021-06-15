@@ -28,12 +28,10 @@ typedef struct CharCode {
 uint64_t charset_len = 0;
 // ------------------------------
 
-uint64_t* calculate_char_freqs(FILE* f)
-{
+uint64_t* calculate_char_freqs(FILE* f) {
 	uint64_t* freq_arr = (uint64_t*) calloc((size_t) TOKEN_SET_LEN, sizeof(uint64_t));
 
-	if (!freq_arr)
-	{
+	if (!freq_arr) {
 		fprintf(stderr, "char frequency allocation failed\n");
 		exit(-1);
 	}
@@ -41,8 +39,7 @@ uint64_t* calculate_char_freqs(FILE* f)
 	fseek(f, 0L, SEEK_SET);
 
 	int c;
-	while ((c = fgetc(f)) != EOF)
-	{
+	while ((c = fgetc(f)) != EOF) {
 		++freq_arr[c];
 	}
 	fseek(f, 0L, SEEK_SET);
@@ -50,8 +47,7 @@ uint64_t* calculate_char_freqs(FILE* f)
 	return freq_arr;
 }
 
-uint64_t get_num_chars(uint64_t* freq_arr)
-{
+uint64_t get_num_chars(uint64_t* freq_arr) {
 	uint64_t num_chars = 0;
 	for (uint64_t i = 0; i < TOKEN_SET_LEN; ++i)
 		if (freq_arr[i] != 0)
@@ -59,11 +55,9 @@ uint64_t get_num_chars(uint64_t* freq_arr)
 	return num_chars;
 }
 
-Node* init_node(Node* n1, Node* n2, unsigned char tkn, unsigned int cnt, bool is_leaf)
-{
+Node* init_node(Node* n1, Node* n2, unsigned char tkn, unsigned int cnt, bool is_leaf) {
 	Node* N = (Node*) malloc(sizeof(Node));
-	if (N == NULL)
-	{
+	if (N == NULL) {
 		printf("Failure initializing Node: %s\n", strerror(errno));
 		exit(1);
 	}
@@ -75,12 +69,10 @@ Node* init_node(Node* n1, Node* n2, unsigned char tkn, unsigned int cnt, bool is
 	return N;
 }
 
-CharCode* init_charcode(uint64_t char_code, uint64_t fin_idx,	char token)
-{
+CharCode* init_charcode(uint64_t char_code, uint64_t fin_idx,	char token) {
 	CharCode* C = (CharCode*) malloc(sizeof(CharCode));
-	if (C ==NULL)
-	{
-		printf("Failure initializing Node: %s\n", strerror(errno));
+	if (C ==NULL) {
+		printf("Failure initializing CharCode: %s\n", strerror(errno));
 		exit(1);
 	}
 	C->code = char_code;
@@ -89,8 +81,7 @@ CharCode* init_charcode(uint64_t char_code, uint64_t fin_idx,	char token)
 	return C;
 }
 
-Node** init_node_arr_from_chars(uint64_t* freq_arr, uint64_t num_chars)
-{
+Node** init_node_arr_from_chars(uint64_t* freq_arr, uint64_t num_chars) {
 	uint64_t j = 0;
 	Node** node_arr = (Node**) calloc(num_chars, sizeof(Node*));
 	for (uint64_t i = 0; i < TOKEN_SET_LEN; i++) {
@@ -102,28 +93,24 @@ Node** init_node_arr_from_chars(uint64_t* freq_arr, uint64_t num_chars)
 	return node_arr;
 }
 
-void swap_idxs(Node** node_arr, uint64_t lidx, uint64_t slidx, uint64_t max_idx)
-{
+void swap_idxs(Node** node_arr, uint64_t lidx, uint64_t slidx, uint64_t max_idx) {
 	// Know lidx != slidx
 	// ensure lidx  == max_idx - 1 or max_idx - 2
 	// ensure slidx == max_idx - 1 or max_idx - 2
 	// For now, restrict lidx == max_idx - 1, slidx == max_idx - 2
-	if (lidx != max_idx - 1)
-	{
+	if (lidx != max_idx - 1) {
 		Node* tmp = node_arr[lidx];
 		node_arr[lidx] = node_arr[max_idx - 1];
 		node_arr[max_idx - 1] = tmp;
 	}
-	if (slidx != max_idx - 2)
-	{
+	if (slidx != max_idx - 2) {
 		Node* tmp = node_arr[slidx];
 		node_arr[slidx] = node_arr[max_idx - 2];
 		node_arr[max_idx - 2] = tmp;
 	}
 }
 
-Node** get_min_two(Node** node_arr, uint64_t max_idx)
-{
+Node** get_min_two(Node** node_arr, uint64_t max_idx) {
 	uint64_t lowest = UINT_MAX;
 	uint64_t second_lowest = UINT_MAX;
 	unsigned int lidx = max_idx - 1;
@@ -131,14 +118,12 @@ Node** get_min_two(Node** node_arr, uint64_t max_idx)
 	Node** lowest_pair = (Node**) calloc(2, sizeof(Node*));
 
 	for (unsigned int i = 0; i < max_idx; i++)
-		if (node_arr[i]->count < lowest)
-		{
+		if (node_arr[i]->count < lowest) 	{
 			lowest = node_arr[i]->count;
 			lowest_pair[0] = node_arr[i];
 			lidx = i;
 		}
-		else if (node_arr[i]->count < second_lowest)
-		{
+		else if (node_arr[i]->count < second_lowest) 	{
 			second_lowest = node_arr[i]->count;
 			lowest_pair[1] = node_arr[i];
 			slidx = i;
@@ -150,8 +135,7 @@ Node** get_min_two(Node** node_arr, uint64_t max_idx)
 /* There is probably a more efficient way to construct this tree.
  * Come back to optimize this.
  */
-Node* build_tree(FILE* f, uint64_t* freq_arr)
-{
+Node* build_tree(FILE* f, uint64_t* freq_arr) {
 	uint64_t max_idx = get_num_chars(freq_arr);
 	charset_len = max_idx;
 
@@ -177,17 +161,19 @@ Node* build_tree(FILE* f, uint64_t* freq_arr)
 
 // Recursive call to get tree depth
 // use cnt = 0 at top level
-unsigned int tree_depth(Node* N, unsigned int cnt)
-{
+unsigned int _tree_depth(Node* N, unsigned int cnt) {
 	if (N == NULL) return cnt;
-	return fmax(tree_depth(N->l, cnt+1), tree_depth(N->r, cnt+1));
+	return fmax(_tree_depth(N->l, cnt+1), _tree_depth(N->r, cnt+1));
+}
+
+unsigned int tree_depth(Node* N) {
+	return _tree_depth(N, 0) - 1;
 }
 
 /*
  * Traverse tree
  */
-void traverse_helper(Node* N, CharCode* cur_cmprs, CharCode** write_table)
-{
+void traverse_helper(Node* N, CharCode* cur_cmprs, CharCode** write_table) {
 	if (N->is_leaf) {
 		cur_cmprs->token = N->token;
 		write_table[N->token] = cur_cmprs;
@@ -207,8 +193,7 @@ void traverse_helper(Node* N, CharCode* cur_cmprs, CharCode** write_table)
 	traverse_helper(N->r, right, write_table);
 }
 
-CharCode** traverse_tree(Node* N)
-{
+CharCode** traverse_tree(Node* N) {
 	CharCode** md_arr = (CharCode**) malloc(sizeof(CharCode*) * charset_len);
 	CharCode* first_charcode = init_charcode(0, 0, 0x00);
 	traverse_helper(N, first_charcode, md_arr);
@@ -216,8 +201,7 @@ CharCode** traverse_tree(Node* N)
 }
 
 // i love recursion
-void free_tree(Node* N)
-{
+void free_tree(Node* N) {
 	if (N == NULL)
 		return;
 	free_tree(N->r);
@@ -225,13 +209,11 @@ void free_tree(Node* N)
 	free(N);
 }
 
-void print_padding (int n)
-{
+void print_padding (int n) {
 	for (int i = 0; i < n; i++) putchar('\t');
 }
 
-void print2DUtil(Node* root, int space)
-{
+void print2DUtil(Node* root, int space) {
 	int count = 10;
 
 	// Base case
@@ -266,8 +248,7 @@ void print2DUtil(Node* root, int space)
 	print2DUtil(root->l, space);
 }
 
-void printbe(uint64_t v, uint64_t max_idx)
-{
+void printbe(uint64_t v, uint64_t max_idx) {
 	for (int j = 0; j < max_idx; j++) {
 		printf("%llu", (v & 1));
 		v = v >> 1;
@@ -275,10 +256,8 @@ void printbe(uint64_t v, uint64_t max_idx)
 	printf("\n");
 }
 
-int main(int argc, char *argv[])
-{
-	if (argc != 2)
-	{
+int main(int argc, char *argv[]) {
+	if (argc != 2) {
 		fprintf(stderr, "incorrect number of input arguments; usage: ./a.out <file> \n");
 		exit(-1);
 	}
@@ -286,8 +265,7 @@ int main(int argc, char *argv[])
 	FILE *infile;
 	infile = fopen(argv[1], "rb");
 
-	if (!infile)
-	{
+	if (!infile) {
 		fprintf(stderr, "failed to open %s\n", argv[1]);
 		exit(-1);
 	}
@@ -299,13 +277,11 @@ int main(int argc, char *argv[])
 
 	print2DUtil(tree, 2);
 
-	printf("tree depth: %u\n", tree_depth(tree, 0));
+	printf("tree depth: %u\n", tree_depth(tree));
 	CharCode** v = traverse_tree(tree);
-	for (int i = 0; i < TOKEN_SET_LEN; i++)
-	{
+	for (int i = 0; i < TOKEN_SET_LEN; i++) {
 		printf("Pointer: %p\n", (void *) v[i]);
-		if (v[i])
-		{
+		if (v[i])	{
 			printf("Token: %c ", v[i]->token);
 			printf("Code: ");
 			printbe(v[i]->code, v[i]->fin_idx);
