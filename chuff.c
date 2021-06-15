@@ -6,30 +6,15 @@
 #include <errno.h>
 #include <math.h>
 
+#include "chuff.h"
+
 #define TOKEN_LEN 8 // right now only a token len of 8 bits
 #define TOKEN_SET_LEN 1 << TOKEN_LEN
 
-typedef _Bool bool;
-
-typedef struct Node {
-	struct Node * l, * r;
-	unsigned char token;
-	unsigned int count;
-	bool is_leaf;
-} Node;
-
-typedef struct CharCode {
-	uint64_t code;
-	uint64_t fin_idx;
-	char token;
-} CharCode;
-
-
-uint64_t charset_len = 0;
-// ------------------------------
 
 uint64_t* calculate_char_freqs(FILE* f) {
-	uint64_t* freq_arr = (uint64_t*) calloc((size_t) TOKEN_SET_LEN, sizeof(uint64_t));
+	uint64_t* freq_arr = (uint64_t*) calloc(
+			(size_t) TOKEN_SET_LEN, sizeof(uint64_t));
 
 	if (!freq_arr) {
 		fprintf(stderr, "char frequency allocation failed\n");
@@ -137,7 +122,6 @@ Node** get_min_two(Node** node_arr, uint64_t max_idx) {
  */
 Node* build_tree(FILE* f, uint64_t* freq_arr) {
 	uint64_t max_idx = get_num_chars(freq_arr);
-	charset_len = max_idx;
 
 	Node** node_arr = init_node_arr_from_chars(freq_arr, max_idx);
 	Node* fin_node;
@@ -148,7 +132,7 @@ Node* build_tree(FILE* f, uint64_t* freq_arr) {
 		Node** min_two = get_min_two(node_arr, max_idx);
 		// Create node w/ the two lowest as children
 		unsigned int count = min_two[0]->count + min_two[1]->count;
-		Node* N = init_node(min_two[0], min_two[1], 0x00, count, 0);
+		Node* N = init_node(min_two[0], min_two[1], 0, count, 0);
 		free(min_two);
 		// remove the original two lowest value nodes, insert new node, decrease len number
 		// we can remove the nodes since we can free the node mem in the tree, not in the arr
@@ -170,33 +154,30 @@ unsigned int tree_depth(Node* N) {
 	return _tree_depth(N, 0) - 1;
 }
 
-/*
- * Traverse tree
- */
-void traverse_helper(Node* N, CharCode* cur_cmprs, CharCode** write_table) {
-	if (N->is_leaf) {
+void _traverse(Node* N, CharCode* cur_cmprs, CharCode** write_table) {
+	if (N->token) {
 		cur_cmprs->token = N->token;
 		write_table[N->token] = cur_cmprs;
 		return;
 	}
 	CharCode* left = init_charcode(
-			cur_cmprs->code << 1 | 0x0,
-			cur_cmprs->fin_idx+1,
-			0x00
-	);
+			(cur_cmprs->code << 1) | 0,
+			cur_cmprs->fin_idx + 1,
+			0
+			);
 	CharCode* right = init_charcode(
-			cur_cmprs->code << 1 | 0x1,
-			cur_cmprs->fin_idx+1,
-			0x00
-	);
-	traverse_helper(N->l, left, write_table);
-	traverse_helper(N->r, right, write_table);
+			(cur_cmprs->code << 1) | 1,
+			cur_cmprs->fin_idx + 1,
+			0
+			);
+	_traverse(N->l, left, write_table);
+	_traverse(N->r, right, write_table);
 }
 
 CharCode** traverse_tree(Node* N) {
-	CharCode** md_arr = (CharCode**) malloc(sizeof(CharCode*) * charset_len);
-	CharCode* first_charcode = init_charcode(0, 0, 0x00);
-	traverse_helper(N, first_charcode, md_arr);
+	CharCode** md_arr = (CharCode**) calloc(TOKEN_SET_LEN, sizeof(CharCode*));
+	CharCode* first_charcode = init_charcode(0, 1, 0);
+	_traverse(N, first_charcode, md_arr);
 	return md_arr;
 }
 
@@ -209,52 +190,6 @@ void free_tree(Node* N) {
 	free(N);
 }
 
-void print_padding (int n) {
-	for (int i = 0; i < n; i++) putchar('\t');
-}
-
-void print2DUtil(Node* root, int space) {
-	int count = 10;
-
-	// Base case
-	if (root == NULL)
-		return;
-
-	// Increase distance between levels
-	space += count;
-
-	// Process right child first
-	print2DUtil(root->r, space);
-
-	// Print current node after space
-	// count
-	printf("\n");
-	for (int i = count; i < space; i++)
-		printf(" ");
-
-	char c[4] = "   ";
-	if (root->token == '\n') {
-		strcpy(c, "\\n");
-	} else if (root->token == '\t') {
-		strcpy(c, "\\t");
-	} else if (root->token == ' ') {
-		strcpy(c, "' '");
-	} else {
-		c[1] = root->token;
-	}
-	printf("%s: %d\n", c, root->count);
-
-	// Process left child
-	print2DUtil(root->l, space);
-}
-
-void printbe(uint64_t v, uint64_t max_idx) {
-	for (int j = 0; j < max_idx; j++) {
-		printf("%llu", (v & 1));
-		v = v >> 1;
-	}
-	printf("\n");
-}
 
 int main(int argc, char *argv[]) {
 	if (argc != 2) {
@@ -277,26 +212,18 @@ int main(int argc, char *argv[]) {
 
 	print2DUtil(tree, 2);
 
-	printf("tree depth: %u\n", tree_depth(tree));
 	CharCode** v = traverse_tree(tree);
 	for (int i = 0; i < TOKEN_SET_LEN; i++) {
-		printf("Pointer: %p\n", (void *) v[i]);
 		if (v[i])	{
 			printf("Token: %c ", v[i]->token);
-			printf("Code: ");
-			printbe(v[i]->code, v[i]->fin_idx);
+			printf("Code (%llu): ", v[i]->code);
+			printle(v[i]->code, v[i]->fin_idx);
+			printf(" \n");
 		}
-		printf("-------------\n");
 	}
-	// To Do
-	// - How to represent write table, for variable token len? make write table
-	// - how to write bytes for variable token len?
-	// For now, just individual bytes
 
 	/* print2DUtil(tree, 0); */
 	free_tree(tree);
-
-
 
 	// Write file with Huffman Tree Symbols
 	free(freq_arr);
