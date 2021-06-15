@@ -163,13 +163,11 @@ void _traverse(Node* N, CharCode* cur_cmprs, CharCode** write_table) {
 	CharCode* left = init_charcode(
 			(cur_cmprs->code << 1) | 0,
 			cur_cmprs->fin_idx + 1,
-			0
-			);
+			0);
 	CharCode* right = init_charcode(
 			(cur_cmprs->code << 1) | 1,
 			cur_cmprs->fin_idx + 1,
-			0
-			);
+			0);
 	_traverse(N->l, left, write_table);
 	_traverse(N->r, right, write_table);
 }
@@ -216,7 +214,7 @@ int main(int argc, char *argv[]) {
 	for (int i = 0; i < TOKEN_SET_LEN; i++) {
 		if (v[i])	{
 			printf("Token: %c ", v[i]->token);
-			printf("Code (%llu): ", v[i]->code);
+			printf("Code: ");
 			printle(v[i]->code, v[i]->fin_idx);
 			printf(" \n");
 		}
