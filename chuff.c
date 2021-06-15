@@ -18,7 +18,14 @@ typedef struct Node {
 	bool is_leaf;
 } Node;
 
+typedef struct CharCode {
+	uint64_t code;
+	uint64_t fin_idx;
+	char token;
+} CharCode;
 
+
+uint64_t charset_len = 0;
 // ------------------------------
 
 uint64_t* calculate_char_freqs(FILE* f)
@@ -66,6 +73,20 @@ Node* init_node(Node* n1, Node* n2, unsigned char tkn, unsigned int cnt, bool is
 	N->count = cnt;
 	N->is_leaf = is_leaf;
 	return N;
+}
+
+CharCode* init_charcode(uint64_t char_code, uint64_t fin_idx,	char token)
+{
+	CharCode* C = (CharCode*) malloc(sizeof(CharCode));
+	if (C ==NULL)
+	{
+		printf("Failure initializing Node: %s\n", strerror(errno));
+		exit(1);
+	}
+	C->code = char_code;
+	C->fin_idx = fin_idx;
+	C->token = token;
+	return C;
 }
 
 Node** init_node_arr_from_chars(uint64_t* freq_arr, uint64_t num_chars)
@@ -132,6 +153,8 @@ Node** get_min_two(Node** node_arr, uint64_t max_idx)
 Node* build_tree(FILE* f, uint64_t* freq_arr)
 {
 	uint64_t max_idx = get_num_chars(freq_arr);
+	charset_len = max_idx;
+
 	Node** node_arr = init_node_arr_from_chars(freq_arr, max_idx);
 	Node* fin_node;
 
@@ -152,6 +175,47 @@ Node* build_tree(FILE* f, uint64_t* freq_arr)
 	return fin_node;
 }
 
+// Recursive call to get tree depth
+// use cnt = 0 at top level
+unsigned int tree_depth(Node* N, unsigned int cnt)
+{
+	if (N == NULL) return cnt;
+	return fmax(tree_depth(N->l, cnt+1), tree_depth(N->r, cnt+1));
+}
+
+/*
+ * Traverse tree
+ */
+void traverse_helper(Node* N, CharCode* cur_cmprs, CharCode** write_table)
+{
+	if (N->is_leaf) {
+		cur_cmprs->token = N->token;
+		write_table[N->token] = cur_cmprs;
+		return;
+	}
+	CharCode* left = init_charcode(
+			cur_cmprs->code << 1 | 0x0,
+			cur_cmprs->fin_idx+1,
+			0x00
+	);
+	CharCode* right = init_charcode(
+			cur_cmprs->code << 1 | 0x1,
+			cur_cmprs->fin_idx+1,
+			0x00
+	);
+	traverse_helper(N->l, left, write_table);
+	traverse_helper(N->r, right, write_table);
+}
+
+CharCode** traverse_tree(Node* N)
+{
+	CharCode** md_arr = (CharCode**) malloc(sizeof(CharCode*) * charset_len);
+	CharCode* first_charcode = init_charcode(0, 0, 0x00);
+	traverse_helper(N, first_charcode, md_arr);
+	return md_arr;
+}
+
+// i love recursion
 void free_tree(Node* N)
 {
 	if (N == NULL)
@@ -161,7 +225,7 @@ void free_tree(Node* N)
 	free(N);
 }
 
-void padding (int n)
+void print_padding (int n)
 {
 	for (int i = 0; i < n; i++) putchar('\t');
 }
@@ -202,6 +266,15 @@ void print2DUtil(Node* root, int space)
 	print2DUtil(root->l, space);
 }
 
+void printbe(uint64_t v, uint64_t max_idx)
+{
+	for (int j = 0; j < max_idx; j++) {
+		printf("%llu", (v & 1));
+		v = v >> 1;
+	}
+	printf("\n");
+}
+
 int main(int argc, char *argv[])
 {
 	if (argc != 2)
@@ -219,22 +292,35 @@ int main(int argc, char *argv[])
 		exit(-1);
 	}
 
-	// Get Char Frequencies
-	//  - create array of correct size (cf_arr)
-	//    - max size is 2^TOKEN_LEN
-	//    - cell size for now is uint64_t - may be able to do varying type with switch statements
-	//    - max filesize: 2^64 bytes
-	//    - size_t cell_size = (size_t) ceil(log2(file_len) / 8);
-	//  - for char in file:
-	//    - convert token to int/long/etc
-	//    - cf_arr[token]++
-
 	uint64_t* freq_arr = calculate_char_freqs(infile);
 
 	// Build Huffman Tree with Frequencies
 	Node* tree = build_tree(infile, freq_arr);
-	print2DUtil(tree, 0);
+
+	print2DUtil(tree, 2);
+
+	printf("tree depth: %u\n", tree_depth(tree, 0));
+	CharCode** v = traverse_tree(tree);
+	for (int i = 0; i < TOKEN_SET_LEN; i++)
+	{
+		printf("Pointer: %p\n", (void *) v[i]);
+		if (v[i])
+		{
+			printf("Token: %c ", v[i]->token);
+			printf("Code: ");
+			printbe(v[i]->code, v[i]->fin_idx);
+		}
+		printf("-------------\n");
+	}
+	// To Do
+	// - How to represent write table, for variable token len? make write table
+	// - how to write bytes for variable token len?
+	// For now, just individual bytes
+
+	/* print2DUtil(tree, 0); */
 	free_tree(tree);
+
+
 
 	// Write file with Huffman Tree Symbols
 	free(freq_arr);
