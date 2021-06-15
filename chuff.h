@@ -4,14 +4,14 @@ typedef struct Node {
 	struct Node * l, * r;
 	unsigned char token;
 	unsigned int count;
-	bool is_leaf;
 } Node;
 
 typedef struct CharCode {
 	uint64_t code;
 	uint64_t fin_idx;
-	char token;
+	unsigned char token;
 } CharCode;
+
 
 void print_padding (int n) {
 	for (int i = 0; i < n; i++) putchar('\t');
