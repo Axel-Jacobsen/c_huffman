@@ -179,6 +179,13 @@ CharCode** traverse_tree(Node* N) {
 	return md_arr;
 }
 
+void free_charcodes(CharCode** C) {
+	for (int i = 0; i < TOKEN_SET_LEN; i++) {
+		if (C[i])
+			free(C[i]);
+	}
+}
+
 // i love recursion
 void free_tree(Node* N) {
 	if (N == NULL)
@@ -210,18 +217,19 @@ int main(int argc, char *argv[]) {
 
 	print2DUtil(tree, 2);
 
-	CharCode** v = traverse_tree(tree);
+	CharCode** C = traverse_tree(tree);
 	for (int i = 0; i < TOKEN_SET_LEN; i++) {
-		if (v[i])	{
-			printf("Token: %c ", v[i]->token);
+		if (C[i])	{
+			printf("Token: %c ", C[i]->token);
 			printf("Code: ");
-			printle(v[i]->code, v[i]->fin_idx);
+			printle(C[i]->code, C[i]->fin_idx);
 			printf(" \n");
 		}
 	}
 
 	/* print2DUtil(tree, 0); */
 	free_tree(tree);
+	free_charcodes(C);
 
 	// Write file with Huffman Tree Symbols
 	free(freq_arr);
