@@ -13,6 +13,13 @@ typedef struct CharCode {
 } CharCode;
 
 
+void printle(uint64_t v, uint64_t max_idx) {
+	for (uint64_t j = max_idx; j > 0; j--) {
+		uint64_t shift = 1 << (j - 1);
+		printf("%d", (bool)((v & shift) == shift));
+	}
+}
+
 void print_padding (int n) {
 	for (int i = 0; i < n; i++) putchar('\t');
 }
@@ -36,17 +43,8 @@ void print2DUtil(Node* root, int space) {
 	for (int i = count; i < space; i++)
 		printf(" ");
 
-	char c[4] = "   ";
-	if (root->token == '\n') {
-		strcpy(c, "\\n");
-	} else if (root->token == '\t') {
-		strcpy(c, "\\t");
-	} else if (root->token == ' ') {
-		strcpy(c, "' '");
-	} else {
-		c[1] = root->token;
-	}
-	printf("%s: %d\n", c, root->count);
+	printle(root->token, 8);
+	printf(": %d\n", root->count);
 
 	// Process left child
 	print2DUtil(root->l, space);
@@ -59,9 +57,3 @@ void printbe(uint64_t v, uint64_t max_idx) {
 	}
 }
 
-void printle(uint64_t v, uint64_t max_idx) {
-	for (uint64_t j = max_idx; j > 0; j--) {
-		uint64_t shift = 1 << (j - 1);
-		printf("%d", (bool)((v & shift) == shift));
-	}
-}

@@ -118,7 +118,7 @@ Node** get_min_two(Node** node_arr, uint64_t max_idx) {
 /* There is probably a more efficient way to construct this tree.
  * Come back to optimize this.
  */
-Node* build_tree(FILE* f, uint64_t* freq_arr) {
+Node* build_tree(uint64_t* freq_arr) {
 	uint64_t max_idx = get_num_chars(freq_arr);
 
 	Node* fin_node;
@@ -197,13 +197,13 @@ void free_tree(Node* N, int level) {
 	printle(N->token, 8);
 	printf("\n");
 
-	/* if ((N->r != NULL || N->l != NULL) && N->token != 0) { */
-	/* 	printf("ERROR ERROR ERROR\n"); */
-	/* 	uint64_t pp = (uint64_t) N; */
-	/* 	printf("%llu\n", pp); */
-	/* 	fprintf(stderr, "fuck! how the hell did the node get a token \n"); */
-	/* 	exit(-1); */
-	/* } */
+	if ((N->r != NULL || N->l != NULL) && N->token != 0) {
+		printf("ERROR ERROR ERROR\n");
+		uint64_t pp = (uint64_t) N;
+		printf("%llu\n", pp);
+		fprintf(stderr, "fuck! how the hell did the node get a token \n");
+		exit(-1);
+	}
 
 	free_tree(N->r, level+1);
 	free_tree(N->l, level+1);
@@ -226,7 +226,7 @@ int main(int argc, char *argv[]) {
 	uint64_t* freq_arr = calculate_char_freqs(infile);
 
 	// Build Huffman Tree with Frequencies
-	Node* tree = build_tree(infile, freq_arr);
+	Node* tree = build_tree(freq_arr);
 
 	print2DUtil(tree, 4);
 
