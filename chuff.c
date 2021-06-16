@@ -95,8 +95,10 @@ void swap_idxs(Node** node_arr, uint64_t lidx, uint64_t slidx, uint64_t max_idx)
 Node** get_min_two(Node** node_arr, uint64_t max_idx) {
 	uint64_t lowest = UINT_MAX;
 	uint64_t second_lowest = UINT_MAX;
+
 	unsigned int lidx = max_idx - 1;
 	unsigned int slidx = max_idx - 2;
+
 	Node** lowest_pair = (Node**) calloc(2, sizeof(Node*));
 
 	for (uint64_t i = 0; i < max_idx; i++) {
@@ -135,8 +137,8 @@ Node* build_tree(uint64_t* freq_arr) {
 		// remove the original two lowest value nodes, insert new node, decrease len number
 		// we can remove the nodes since we can free the node mem in the tree, not in the arr
 		node_arr[max_idx - 2] = N;
-		fin_node = N;
 		max_idx--;
+		fin_node = N;
 	}
 	return fin_node;
 }
@@ -155,11 +157,14 @@ unsigned int tree_depth(Node* N) {
 }
 
 void _traverse(Node* N, CharCode* cur_cmprs, CharCode** write_table) {
+	// add is_leaf back to node
 	if (N->token) {
+		printf("buh\n");
 		cur_cmprs->token = N->token;
 		write_table[N->token] = cur_cmprs;
 		return;
 	}
+	printf("muh\n");
 	CharCode* left_charcode = init_charcode(
 			(cur_cmprs->code << 1) | 0,
 			cur_cmprs->fin_idx + 1,
@@ -174,6 +179,10 @@ void _traverse(Node* N, CharCode* cur_cmprs, CharCode** write_table) {
 
 CharCode** traverse_tree(Node* N) {
 	CharCode** md_arr = (CharCode**) calloc(TOKEN_SET_LEN, sizeof(CharCode*));
+	if (!md_arr) {
+		fprintf(stderr, "couldn't shouldn't wouldn't\n");
+		exit(-1);
+	}
 	CharCode* first_charcode = init_charcode(0, 0, 0);
 	_traverse(N, first_charcode, md_arr);
 	return md_arr;
@@ -228,9 +237,11 @@ int main(int argc, char *argv[]) {
 	// Build Huffman Tree with Frequencies
 	Node* tree = build_tree(freq_arr);
 
-	print2DUtil(tree, 4);
+	print2DUtil(tree, 1);
 
+	printf("traversing tree\n");
 	CharCode** C = traverse_tree(tree);
+	printf("done traversing tree\n");
 	for (int i = 0; i < TOKEN_SET_LEN; i++) {
 		if (C[i])	{
 			printf("TKN: ");
@@ -243,7 +254,6 @@ int main(int argc, char *argv[]) {
 	}
 	printf("Done Loop\n");
 
-	/* print2DUtil(tree, 0); */
 	printf("Freeing Tree\n");
 	free_tree(tree, 0);
 	printf("Freeing Charcodes\n");
