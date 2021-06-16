@@ -12,9 +12,7 @@
 #define TOKEN_SET_LEN 1 << TOKEN_LEN
 
 uint64_t* calculate_char_freqs(FILE* f) {
-	uint64_t* freq_arr = (uint64_t*) calloc(
-			(size_t) TOKEN_SET_LEN, sizeof(uint64_t));
-
+	uint64_t* freq_arr = (uint64_t*) calloc((size_t) TOKEN_SET_LEN, sizeof(uint64_t));
 	if (!freq_arr) {
 		fprintf(stderr, "char frequency allocation failed\n");
 		exit(-1);
@@ -194,18 +192,18 @@ void free_tree(Node* N, int level) {
 
 	for (int i = 0; i < level; i++)
 		printf(" ");
+
 	printf("%p: R: %d L: %d TKN: ", (void*)N, N->r == NULL, N->l == NULL);
 	printle(N->token, 8);
 	printf("\n");
 
-
-	if ((N->r != NULL || N->l != NULL) && N->token != 0) {
-		printf("ERROR ERROR ERROR\n");
-		uint64_t pp = (uint64_t) N;
-		printf("%llu\n", pp);
-		fprintf(stderr, "fuck! how the hell did the node get a token \n");
-		exit(-1);
-	}
+	/* if ((N->r != NULL || N->l != NULL) && N->token != 0) { */
+	/* 	printf("ERROR ERROR ERROR\n"); */
+	/* 	uint64_t pp = (uint64_t) N; */
+	/* 	printf("%llu\n", pp); */
+	/* 	fprintf(stderr, "fuck! how the hell did the node get a token \n"); */
+	/* 	exit(-1); */
+	/* } */
 
 	free_tree(N->r, level+1);
 	free_tree(N->l, level+1);
@@ -220,7 +218,6 @@ int main(int argc, char *argv[]) {
 
 	FILE *infile;
 	infile = fopen(argv[1], "r");
-
 	if (!infile) {
 		fprintf(stderr, "failed to open %s\n", argv[1]);
 		exit(-1);

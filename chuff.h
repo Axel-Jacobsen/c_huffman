@@ -2,8 +2,8 @@ typedef _Bool bool;
 
 typedef struct Node {
 	struct Node * l, * r;
-	unsigned char token;
 	unsigned int count;
+	unsigned char token;
 } Node;
 
 typedef struct CharCode {
