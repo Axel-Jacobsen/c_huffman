@@ -83,5 +83,5 @@ try:
 except networkx.exception.NetworkXNoCycle:
     print("No Cycle :)")
 
-networkx.draw_planar(G, node_size=10)
+networkx.draw_planar(G, with_labels=True, node_size=10)
 plt.show()
