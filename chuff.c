@@ -20,9 +20,9 @@
  *		freeing you print, you see multiple nodes occurring frequently.
  *		occurs also for only some infiles of larger size.
  *
- *    init_node_arr_from_chars:
- *      - 
- *
+ *		From "assert_tree_creation.py", we know that breaking files have
+ *		cyclic graphs, instead of trees! Can start narrowing down these
+ *		issues
  */
 
 uint64_t* calculate_char_freqs(FILE* f) {
