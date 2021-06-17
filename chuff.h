@@ -2,15 +2,15 @@ typedef _Bool bool;
 
 typedef struct Node {
 	const struct Node * l, * r;
-	unsigned int count;
-	unsigned char token;
+	uint64_t count;
+	uint8_t token;
 	bool is_leaf;
 } Node;
 
 typedef struct CharCode {
 	uint64_t code;
 	uint64_t fin_idx;
-	unsigned char token;
+	uint8_t token;
 } CharCode;
 
 
@@ -45,7 +45,7 @@ void print2DUtil(const Node* root, int space) {
 		printf(" ");
 
 	printle(root->token, 8);
-	printf(": %d\n", root->count);
+	printf(": %llu\n", root->count);
 
 	// Process left child
 	print2DUtil(root->l, space);

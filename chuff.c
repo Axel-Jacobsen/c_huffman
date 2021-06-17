@@ -11,6 +11,20 @@
 #define TOKEN_LEN 8 // right now only a token len of 8 bits
 #define TOKEN_SET_LEN 1 << TOKEN_LEN
 
+/* Errors:
+ * 
+ *	free_tree: two classes of errors
+ *		- segfault - freeing the same node twice, implying tree is graph
+ *		- free non-malloc'd mem - implying... huh?
+ *		these two imply graph creation is messed up somehow. if instead of
+ *		freeing you print, you see multiple nodes occurring frequently.
+ *		occurs also for only some infiles of larger size.
+ *
+ *    init_node_arr_from_chars:
+ *      - 
+ *
+ */
+
 uint64_t* calculate_char_freqs(FILE* f) {
 	uint64_t* freq_arr = (uint64_t*) calloc((size_t) TOKEN_SET_LEN, sizeof(uint64_t));
 	if (!freq_arr) {
@@ -39,8 +53,7 @@ uint64_t get_num_chars(uint64_t* freq_arr) {
 	return num_chars;
 }
 
-const Node* init_node(const Node* n1, const Node* n2, unsigned char tkn, unsigned int cnt, bool is_leaf) {
-	printf("initing new node\n");
+const Node* init_node(const Node* n1, const Node* n2, uint8_t tkn, uint64_t cnt, bool is_leaf) {
 	Node* N = (Node*) malloc(sizeof(Node));
 	if (!N) {
 		printf("Failure initializing Node: %s\n", strerror(errno));
@@ -49,9 +62,9 @@ const Node* init_node(const Node* n1, const Node* n2, unsigned char tkn, unsigne
 		fprintf(stderr, "initializing node with non-null children and token \n");
 		exit(1);
 	}
-	printf("L: %p  R: %p  TKN: ", (void*) n1, (void*) n2);
+	printf("ME: %p  L: %p  R: %p  TKN: ", (void*) N, (void*) n1, (void*) n2);
 	printle(tkn, 8);
-	printf("  count: %d  is_leaf: %d\n", cnt, is_leaf);
+	printf("  count: %llu  is_leaf: %d\n", cnt, is_leaf);
 	N->l = n1;
 	N->r = n2;
 	N->token = tkn;
@@ -60,7 +73,7 @@ const Node* init_node(const Node* n1, const Node* n2, unsigned char tkn, unsigne
 	return (const Node*) N;
 }
 
-CharCode* init_charcode(uint64_t char_code, uint64_t fin_idx,	unsigned char token) {
+CharCode* init_charcode(uint64_t char_code, uint64_t fin_idx,	uint8_t token) {
 	CharCode* C = (CharCode*) malloc(sizeof(CharCode));
 	if (C ==NULL) {
 		printf("Failure initializing CharCode: %s\n", strerror(errno));
@@ -74,10 +87,14 @@ CharCode* init_charcode(uint64_t char_code, uint64_t fin_idx,	unsigned char toke
 
 const Node** init_node_arr_from_chars(uint64_t* freq_arr, uint64_t num_chars) {
 	uint64_t j = 0;
+	if (num_chars > SIZE_MAX) { // DLTBL
+		printf("HACF\n" );
+		exit(1);
+	}
 	const Node** node_arr = (const Node**) calloc(num_chars, sizeof(const Node*));
 	for (uint64_t i = 0; i < TOKEN_SET_LEN; i++) {
 		if (freq_arr[i] != 0) {
-			node_arr[j] = init_node(NULL, NULL, (unsigned char)i, freq_arr[i], 1);
+			node_arr[j] = init_node(NULL, NULL, i, freq_arr[i], 1);
 			++j;
 		}
 	}
@@ -169,11 +186,11 @@ void _traverse(const Node* N, CharCode* cur_cmprs, CharCode** write_table) {
 		return;
 	}
 	CharCode* left_charcode = init_charcode(
-			(cur_cmprs->code << 1) | 0,
+			cur_cmprs->code << 1 | 0,
 			cur_cmprs->fin_idx + 1,
 			0);
 	CharCode* right_charcode = init_charcode(
-			(cur_cmprs->code << 1) | 1,
+			cur_cmprs->code << 1 | 1,
 			cur_cmprs->fin_idx + 1,
 			0);
 	_traverse(N->l, left_charcode, write_table);
@@ -211,8 +228,8 @@ void free_tree(const Node* N, int level) {
 	printf("\n");
 
 	if ((N->r != NULL || N->l != NULL) && N->token != 0) {
-		printf("ERROR ERROR ERROR\n");
-		/* fprintf(stderr, "fuck! how the hell did the node get a token \n"); */
+		printf("ERROR ERROR ERROR in free_tree\n");
+		fprintf(stderr, "fuck! how the hell did the node get a token \n");
 		/* exit(1); */
 	}
 	// END PRINT BLOCK
@@ -243,26 +260,27 @@ int main(int argc, char *argv[]) {
 	const Node* tree = build_tree(freq_arr);
 
 	print2DUtil(tree, 1);
-
+	unsigned int D = tree_depth(tree);
+	printf("treeeee depth: %d\n", D);
 	printf("traversing tree\n");
-	CharCode** C = traverse_tree(tree);
-	printf("done traversing tree\n");
-	for (int i = 0; i < TOKEN_SET_LEN; i++) {
-		if (C[i])	{
-			printf("TKN: ");
-			printle(C[i]->token, 8);
-			printf("\n");
-			printf("Code: ");
-			printle(C[i]->code, C[i]->fin_idx);
-			printf(" \n\n");
-		}
-	}
+	/* CharCode** C = traverse_tree(tree); */
+	/* printf("done traversing tree\n"); */
+	/* for (int i = 0; i < TOKEN_SET_LEN; i++) { */
+	/* 	if (C[i])	{ */
+	/* 		printf("TKN: "); */
+	/* 		printle(C[i]->token, 8); */
+	/* 		printf("\n"); */
+	/* 		printf("Code: "); */
+	/* 		printle(C[i]->code, C[i]->fin_idx); */
+	/* 		printf(" \n\n"); */
+	/* 	} */
+	/* } */
 	printf("Done Loop\n");
 
 	printf("Freeing Tree\n");
 	free_tree(tree, 0);
 	printf("Freeing Charcodes\n");
-	free_charcodes(C);
+	/* free_charcodes(C); */
 	printf("Freeing Freq. Arr.\n");
 	free(freq_arr);
 	printf("Done\n");
