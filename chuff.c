@@ -132,8 +132,20 @@ Node* build_tree(uint64_t* freq_arr) {
 		Node** min_two = get_min_two(node_arr, max_idx);
 		// Create node w/ the two lowest as children
 		uint64_t count = min_two[0]->count + min_two[1]->count;
-		Node* N = init_node(min_two[0], min_two[1], 0, count);
-		free(min_two);
+		int i,j;
+		// Weird: if i=0,j=1 for both cases, then when running huff on
+		//	enwik8 -> free already free'd element (segfault)
+		//  small_breaking -> pointer being free'd not allocated
+		// if i=0,j=1 for even, i=1,j=0 for odd,
+		//	enwik8 -> pointer being free'd not allocated
+		//  small_breaking -> free already free'd element (segfault)
+		if (max_idx % 2 == 0) {
+			i = 0; j = 1;
+		} else {
+			i = 1; j = 0;
+		}
+		Node* N = init_node(min_two[i], min_two[j], 0, count);
+		/* free(min_two); */
 		// remove the original two lowest value nodes, insert new node, decrease len number
 		// we can remove the nodes since we can free the node mem in the tree, not in the arr
 		node_arr[max_idx - 2] = N;
@@ -211,7 +223,7 @@ void free_tree(Node* N, int level) {
 		uint64_t pp = (uint64_t) N;
 		printf("%llu\n", pp);
 		fprintf(stderr, "fuck! how the hell did the node get a token \n");
-		exit(-1);
+		/* exit(-1); */
 	}
 
 	free_tree(N->r, level+1);
@@ -255,6 +267,8 @@ int main(int argc, char *argv[]) {
 	printf("Done Loop\n");
 
 	printf("Freeing Tree\n");
+	unsigned int D = tree_depth(tree);
+	printf("DEPTHY %u\n", D);
 	free_tree(tree, 0);
 	printf("Freeing Charcodes\n");
 	free_charcodes(C);
