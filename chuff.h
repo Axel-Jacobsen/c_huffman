@@ -4,6 +4,7 @@ typedef struct Node {
 	struct Node * l, * r;
 	unsigned int count;
 	unsigned char token;
+	bool is_leaf;
 } Node;
 
 typedef struct CharCode {

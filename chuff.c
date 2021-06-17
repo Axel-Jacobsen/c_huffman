@@ -39,7 +39,7 @@ uint64_t get_num_chars(uint64_t* freq_arr) {
 	return num_chars;
 }
 
-Node* init_node(Node* n1, Node* n2, unsigned char tkn, unsigned int cnt) {
+Node* init_node(Node* n1, Node* n2, unsigned char tkn, unsigned int cnt, bool is_leaf) {
 	Node* N = (Node*) malloc(sizeof(Node));
 	if (N == NULL) {
 		printf("Failure initializing Node: %s\n", strerror(errno));
@@ -52,6 +52,7 @@ Node* init_node(Node* n1, Node* n2, unsigned char tkn, unsigned int cnt) {
 	N->r = n2;
 	N->token = tkn;
 	N->count = cnt;
+	N->is_leaf = is_leaf;
 	return N;
 }
 
@@ -72,7 +73,7 @@ Node** init_node_arr_from_chars(uint64_t* freq_arr, uint64_t num_chars) {
 	Node** node_arr = (Node**) calloc(num_chars, sizeof(Node*));
 	for (uint64_t i = 0; i < TOKEN_SET_LEN; i++) {
 		if (freq_arr[i] != 0) {
-			node_arr[j] = init_node(NULL, NULL, (unsigned char)i, freq_arr[i]);
+			node_arr[j] = init_node(NULL, NULL, (unsigned char)i, freq_arr[i], 1);
 			++j;
 		}
 	}
@@ -144,7 +145,7 @@ Node* build_tree(uint64_t* freq_arr) {
 		} else {
 			i = 1; j = 0;
 		}
-		Node* N = init_node(min_two[i], min_two[j], 0, count);
+		Node* N = init_node(min_two[i], min_two[j], 0, count, 0);
 		/* free(min_two); */
 		// remove the original two lowest value nodes, insert new node, decrease len number
 		// we can remove the nodes since we can free the node mem in the tree, not in the arr
@@ -170,13 +171,11 @@ unsigned int tree_depth(Node* N) {
 
 void _traverse(Node* N, CharCode* cur_cmprs, CharCode** write_table) {
 	// add is_leaf back to node
-	if (N->token) {
-		printf("buh\n");
+	if (N->is_leaf) {
 		cur_cmprs->token = N->token;
 		write_table[N->token] = cur_cmprs;
 		return;
 	}
-	printf("muh\n");
 	CharCode* left_charcode = init_charcode(
 			(cur_cmprs->code << 1) | 0,
 			cur_cmprs->fin_idx + 1,
