@@ -11,7 +11,7 @@ if __name__ != "__main__":
 with open("all_ascii", "rb") as asc:
     asc_str = asc.read()
 
-for fsize in range(1, 32):
+for fsize in range(1, 24):
     with open("testf", "wb") as f:
         f.write(asc_str * (1 << fsize))
 
