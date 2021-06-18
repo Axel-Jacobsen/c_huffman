@@ -70,7 +70,6 @@ Node* init_node(Node* n1, Node* n2, uint8_t tkn, uint64_t cnt, bool is_leaf) {
 	N->token = tkn;
 	N->count = cnt;
 	N->is_leaf = is_leaf;
-	N->in_tree = 0;
 	return (Node*) N;
 }
 
@@ -123,19 +122,12 @@ Node** get_min_two(Node** node_arr, uint64_t max_idx) {
 	int64_t lidx = UINT_MAX;
 	int64_t slidx = UINT_MAX;
 
-	printf("getting min nodes\n");
 	Node** lowest_pair = (Node**) calloc(2, sizeof(Node*));
 	if (!lowest_pair) {
 		printf("failure initializing node array in get_min_two: %s\n", strerror(errno));
 		exit(1);
 	}
 	for (uint64_t i = 0; i < max_idx; i++) {
-		printf("  i in node arr: %llu   max_idx: %llu\n", i, max_idx);
-		printf("    node_arr[i]->count = %llu   ->in_tree = %d   lowest = %llu    second lowest = %llu\n", node_arr[i]->count, node_arr[i]->in_tree, lowest, second_lowest);
-		if (node_arr[i]->in_tree) {
-			printf("Node In tree: %p %llu\n", (void*)node_arr[i], node_arr[i]->count);
-			exit(-1);
-		}
 		if (node_arr[i]->count < lowest) 	{
 			lowest = node_arr[i]->count;
 			lowest_pair[0] = node_arr[i];
@@ -146,15 +138,6 @@ Node** get_min_two(Node** node_arr, uint64_t max_idx) {
 			lowest_pair[1] = node_arr[i];
 			slidx = i;
 		}
-	}
-	if (lidx == -1)
-	{
-		printf("lower not swapped\n");
-		exit(1);
-	}
-	if (slidx == -1){
-		printf("slower not swapped\n");
-		exit(1);
 	}
 	swap_idxs(node_arr, slidx, lidx, max_idx);
 	return lowest_pair;
@@ -184,8 +167,6 @@ Node* build_tree(uint64_t* freq_arr) {
 		uint64_t count = c1 + c2; //min_two[0]->count + min_two[1]->count;
 		Node* N = init_node(min_two[0], min_two[1], 0, count, 0);
 		printf("inserting mins into tree\n");
-		min_two[0]->in_tree = 1;
-		min_two[1]->in_tree = 1;
 		free(min_two);
 
 		// remove the original two lowest value nodes, insert new node, decrease len number

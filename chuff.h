@@ -5,7 +5,6 @@ typedef struct Node {
 	uint64_t count;
 	uint8_t token;
 	bool is_leaf;
-	bool in_tree;
 } Node;
 
 typedef struct CharCode {
