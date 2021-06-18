@@ -1,10 +1,11 @@
 typedef _Bool bool;
 
 typedef struct Node {
-	const struct Node * l, * r;
+	struct Node * l, * r;
 	uint64_t count;
 	uint8_t token;
 	bool is_leaf;
+	bool in_tree;
 } Node;
 
 typedef struct CharCode {
@@ -25,7 +26,7 @@ void print_padding (int n) {
 	for (int i = 0; i < n; i++) putchar('\t');
 }
 
-void print2DUtil(const Node* root, int space) {
+void print2DUtil(Node* root, int space) {
 	int count = 10;
 
 	// Base case

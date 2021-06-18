@@ -53,7 +53,7 @@ uint64_t get_num_chars(uint64_t* freq_arr) {
 	return num_chars;
 }
 
-const Node* init_node(const Node* n1, const Node* n2, uint8_t tkn, uint64_t cnt, bool is_leaf) {
+Node* init_node(Node* n1, Node* n2, uint8_t tkn, uint64_t cnt, bool is_leaf) {
 	Node* N = (Node*) malloc(sizeof(Node));
 	if (!N) {
 		printf("Failure initializing Node: %s\n", strerror(errno));
@@ -70,7 +70,8 @@ const Node* init_node(const Node* n1, const Node* n2, uint8_t tkn, uint64_t cnt,
 	N->token = tkn;
 	N->count = cnt;
 	N->is_leaf = is_leaf;
-	return (const Node*) N;
+	N->in_tree = 0;
+	return (Node*) N;
 }
 
 CharCode* init_charcode(uint64_t char_code, uint64_t fin_idx,	uint8_t token) {
@@ -85,13 +86,13 @@ CharCode* init_charcode(uint64_t char_code, uint64_t fin_idx,	uint8_t token) {
 	return C;
 }
 
-const Node** init_node_arr_from_chars(uint64_t* freq_arr, uint64_t num_chars) {
+Node** init_node_arr_from_chars(uint64_t* freq_arr, uint64_t num_chars) {
 	uint64_t j = 0;
 	if (num_chars > SIZE_MAX) { // DLTBL
 		printf("HACF\n" );
 		exit(1);
 	}
-	const Node** node_arr = (const Node**) calloc(num_chars, sizeof(const Node*));
+	Node** node_arr = (Node**) calloc(num_chars, sizeof(Node*));
 	for (uint64_t i = 0; i < TOKEN_SET_LEN; i++) {
 		if (freq_arr[i] != 0) {
 			node_arr[j] = init_node(NULL, NULL, i, freq_arr[i], 1);
@@ -101,29 +102,40 @@ const Node** init_node_arr_from_chars(uint64_t* freq_arr, uint64_t num_chars) {
 	return node_arr;
 }
 
-void swap_idxs(const Node** node_arr, uint64_t lidx, uint64_t slidx, uint64_t max_idx) {
-	if (lidx != max_idx - 1) {
-		const Node* tmp = node_arr[lidx];
-		node_arr[lidx] = node_arr[max_idx - 1];
-		node_arr[max_idx - 1] = tmp;
-	}
-	if (slidx != max_idx - 2) {
-		const Node* tmp = node_arr[slidx];
-		node_arr[slidx] = node_arr[max_idx - 2];
-		node_arr[max_idx - 2] = tmp;
-	}
+
+void swap_idxs(Node** node_arr, uint64_t lidx, uint64_t slidx, uint64_t max_idx) {
+	// swap 1
+	Node* ldx_tmp = node_arr[slidx];
+	node_arr[lidx] = node_arr[max_idx - 1];
+	node_arr[max_idx - 1] = ldx_tmp;
+	// swap 2
+	if (slidx == max_idx - 1)
+		slidx = lidx;
+	Node* slidx_tmp = node_arr[slidx];
+	node_arr[slidx] = node_arr[max_idx - 2];
+	node_arr[max_idx - 2] = slidx_tmp;
 }
 
-const Node** get_min_two(const Node** node_arr, uint64_t max_idx) {
+
+Node** get_min_two(Node** node_arr, uint64_t max_idx) {
 	uint64_t lowest = UINT_MAX;
 	uint64_t second_lowest = UINT_MAX;
+	int64_t lidx = UINT_MAX;
+	int64_t slidx = UINT_MAX;
 
-	unsigned int lidx = max_idx - 1;
-	unsigned int slidx = max_idx - 2;
-
-	const Node** lowest_pair = (const Node**) calloc(2, sizeof(const Node*));
-
+	printf("getting min nodes\n");
+	Node** lowest_pair = (Node**) calloc(2, sizeof(Node*));
+	if (!lowest_pair) {
+		printf("failure initializing node array in get_min_two: %s\n", strerror(errno));
+		exit(1);
+	}
 	for (uint64_t i = 0; i < max_idx; i++) {
+		printf("  i in node arr: %llu   max_idx: %llu\n", i, max_idx);
+		printf("    node_arr[i]->count = %llu   ->in_tree = %d   lowest = %llu    second lowest = %llu\n", node_arr[i]->count, node_arr[i]->in_tree, lowest, second_lowest);
+		if (node_arr[i]->in_tree) {
+			printf("Node In tree: %p %llu\n", (void*)node_arr[i], node_arr[i]->count);
+			exit(-1);
+		}
 		if (node_arr[i]->count < lowest) 	{
 			lowest = node_arr[i]->count;
 			lowest_pair[0] = node_arr[i];
@@ -135,50 +147,75 @@ const Node** get_min_two(const Node** node_arr, uint64_t max_idx) {
 			slidx = i;
 		}
 	}
-	swap_idxs(node_arr, lidx, slidx, max_idx);
+	if (lidx == -1)
+	{
+		printf("lower not swapped\n");
+		exit(1);
+	}
+	if (slidx == -1){
+		printf("slower not swapped\n");
+		exit(1);
+	}
+	swap_idxs(node_arr, slidx, lidx, max_idx);
 	return lowest_pair;
 }
 
 /* There is probably a more efficient way to construct this tree.
  * Come back to optimize this.
  */
-const Node* build_tree(uint64_t* freq_arr) {
+Node* build_tree(uint64_t* freq_arr) {
 	uint64_t max_idx = get_num_chars(freq_arr);
 
-	const Node* fin_node;
-	const Node** node_arr = init_node_arr_from_chars(freq_arr, max_idx);
+	Node* fin_node;
+	Node** node_arr = init_node_arr_from_chars(freq_arr, max_idx);
 
 	// when n == 1, return node in array
 	while (max_idx > 1) {
 		// Find two lowest value nodes in node arr, w/ len number giving max len, and their indicies
-		const Node** min_two = get_min_two(node_arr, max_idx);
+		printf("getting min nodes\n");
+		Node** min_two = get_min_two(node_arr, max_idx);
 		// Create node w/ the two lowest as children
-		uint64_t count = min_two[0]->count + min_two[1]->count;
-		const Node* N = init_node(min_two[0], min_two[1], 0, count, 0);
+		printf("creating new node\n");
+		printf("node 1...\n");
+		uint64_t c1 = min_two[0]->count;
+		printf("node 2...\n");
+		uint64_t c2 = min_two[1]->count;
+		printf("can i even add bro\n");
+		uint64_t count = c1 + c2; //min_two[0]->count + min_two[1]->count;
+		Node* N = init_node(min_two[0], min_two[1], 0, count, 0);
+		printf("inserting mins into tree\n");
+		min_two[0]->in_tree = 1;
+		min_two[1]->in_tree = 1;
 		free(min_two);
+
 		// remove the original two lowest value nodes, insert new node, decrease len number
 		// we can remove the nodes since we can free the node mem in the tree, not in the arr
+		printf("inserting into arr\n");
 		node_arr[max_idx - 2] = N;
+		printf("reduce max_idx\n");
 		max_idx--;
+		printf("fin node assignment\n");
 		fin_node = N;
+		printf("max_idx: %llu\n", max_idx);
 	}
+	printf("nadda\n");
 	return fin_node;
 }
 
 // Recursive call to get tree depth
 // use cnt = 0 at top level
-unsigned int _tree_depth(const Node* N, unsigned int cnt) {
+unsigned int _tree_depth(Node* N, unsigned int cnt) {
 	if (N == NULL) return cnt;
 	return fmax(
 			_tree_depth(N->l, cnt + 1),
 			_tree_depth(N->r, cnt + 1));
 }
 
-unsigned int tree_depth(const Node* N) {
+unsigned int tree_depth(Node* N) {
 	return _tree_depth(N, 0) - 1;
 }
 
-void _traverse(const Node* N, CharCode* cur_cmprs, CharCode** write_table) {
+void _traverse(Node* N, CharCode* cur_cmprs, CharCode** write_table) {
 	// add is_leaf back to node
 	if (N->is_leaf) {
 		cur_cmprs->token = N->token;
@@ -197,7 +234,7 @@ void _traverse(const Node* N, CharCode* cur_cmprs, CharCode** write_table) {
 	_traverse(N->r, right_charcode, write_table);
 }
 
-CharCode** traverse_tree(const Node* N) {
+CharCode** traverse_tree(Node* N) {
 	CharCode** md_arr = (CharCode**) calloc(TOKEN_SET_LEN, sizeof(CharCode*));
 	if (!md_arr) {
 		fprintf(stderr, "failed to allocate\n");
@@ -216,7 +253,7 @@ void free_charcodes(CharCode** C) {
 }
 
 // i love recursion
-void free_tree(const Node* N, int level) {
+void free_tree(Node* N, int level) {
 	if (N == NULL) return;
 
 	// PRINT BLOCK
@@ -241,7 +278,7 @@ void free_tree(const Node* N, int level) {
 
 int main(int argc, char *argv[]) {
 	if (argc != 2) {
-		fprintf(stderr, "initializing node with non-null children and token \n");
+		fprintf(stderr, "usage: ./huff <file>\n");
 		exit(1);
 	}
 
@@ -257,7 +294,7 @@ int main(int argc, char *argv[]) {
 
 	printf("building tree...\n");
 	// Build Huffman Tree with Frequencies
-	const Node* tree = build_tree(freq_arr);
+	Node* tree = build_tree(freq_arr);
 
 	print2DUtil(tree, 1);
 	unsigned int D = tree_depth(tree);
