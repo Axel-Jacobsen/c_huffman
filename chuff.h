@@ -9,7 +9,7 @@ typedef struct Node {
 
 typedef struct CharCode {
 	uint64_t code;
-	uint64_t fin_idx;
+	uint8_t code_len;
 	uint8_t token;
 } CharCode;
 
