@@ -15,8 +15,8 @@ typedef struct CharCode {
 
 
 void printle(uint64_t v, uint64_t max_idx) {
-	for (uint64_t j = max_idx; j > 0; j--) {
-		uint64_t shift = 1 << (j - 1);
+	for (uint64_t j = 64; j > 64 - max_idx; j--) {
+		uint64_t shift = (uint64_t) 1 << (j - 1);
 		printf("%d", (bool)((v & shift) == shift));
 	}
 }
@@ -44,7 +44,8 @@ void print2DUtil(Node* root, int space) {
 	for (int i = count; i < space; i++)
 		printf(" ");
 
-	printle(root->token, 8);
+	/* printle(root->token, 8); */
+	printf("%c", root->token);
 	printf(": %llu\n", root->count);
 
 	// Process left child

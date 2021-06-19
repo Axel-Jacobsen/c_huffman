@@ -167,13 +167,14 @@ void _traverse(Node* N, CharCode* cur_cmprs, CharCode** write_table) {
 		return;
 	}
 	CharCode* left_charcode = init_charcode(
-			cur_cmprs->code << 1 | 0,
+			cur_cmprs->code | (uint64_t)0 << (63 - cur_cmprs->fin_idx),
 			cur_cmprs->fin_idx + 1,
 			0);
 	CharCode* right_charcode = init_charcode(
-			cur_cmprs->code << 1 | 1,
+			cur_cmprs->code | (uint64_t)1 << (63 - cur_cmprs->fin_idx),
 			cur_cmprs->fin_idx + 1,
 			0);
+	free(cur_cmprs);
 	_traverse(N->l, left_charcode, write_table);
 	_traverse(N->r, right_charcode, write_table);
 }
@@ -189,29 +190,42 @@ CharCode** traverse_tree(Node* N) {
 	return md_arr;
 }
 
-void write_file_slowly(FILE* infile, FILE* outfile, CharCode** write_table) {
-	fseek(f, 0L, SEEK_END);
-	uint64_t flen = ftell(f);
-	fseek(f, 0L, SEEK_SET);
+/* void write_to_file(FILE* infile, FILE* outfile, CharCode** write_table) { */
+/* 	// LSB of byte is the first instruction (i.e. left/right instruction) */
+/* 	// */ 
+/* 	// */
+/* 	fseek(f, 0L, SEEK_END); */
+/* 	uint64_t flen = ftell(f); */
+/* 	fseek(f, 0L, SEEK_SET); */
 
-	uint64_t write_byte_a = 0;
-	uint64_t write_byte_b = 0;
-	uint8_t write_indx = 0;
+/* 	uint64_t write_byte_a = 0; */
+/* 	uint64_t write_byte_b = 0; */
+/* 	uint64_t write_idx = 0; */
 
-	uint8_t c = 0;
-	// for token in infile
-	for (int i = 0; i < flen; i++) {
-		fread((void*)&c, 1, 1, f);
-		// load token into write_byte
-		// if fin_idx < 8:
-		//		read another byte, get charcode
-		//    load 8 - sum(fin_idx_i) bytes into a
-		//    load new charcode fin_idx into b
-		//    byte a = b
-	// write a to outfile
-	}
-	fseek(f, 0L, SEEK_SET);
-}
+/* 	uint8_t c = 0; */
+/* 	// for token in infile */
+/* 	for (int i = 0; i < flen; i++) { */
+/* 		fread((void*)&c, 1, 1, f); */
+/* 		// load token */
+/* 		char_token = write_table[c]; */
+/* 		// into write_byte */
+/* 		if (char_token->fin_idx < 8) { */
+/* 			write_byte_a = (uint8_t)char_token->code; */
+/* 			write_idx = char_token->fin_idx; */
+/* 		} */
+			
+/* 		write_byte_a = char_token->code; */
+
+
+/* 		// if fin_idx < 8: */
+/* 		//		read another byte, get charcode */
+/* 		//    load 8 - sum(fin_idx_i) bytes into a */
+/* 		//    load new charcode fin_idx into b */
+/* 		//    byte a = b */
+/* 	// write a to outfile */
+/* 	} */
+/* 	fseek(f, 0L, SEEK_SET); */
+/* } */
 
 void free_charcodes(CharCode** C) {
 	for (int i = 0; i < TOKEN_SET_LEN; i++) {
@@ -241,8 +255,8 @@ int main(int argc, char *argv[]) {
 		exit(1);
 	}
 
-	FILE *infile;
-	infile = fopen(argv[2], "r");
+	FILE *outfile;
+	outfile = fopen(argv[2], "r");
 	if (!infile) {
 		fprintf(stderr, "failed to open %s\n", argv[2]);
 		exit(1);
@@ -255,12 +269,19 @@ int main(int argc, char *argv[]) {
 	// Build Huffman Tree with Frequencies
 	Node* tree = build_tree(freq_arr);
 
-
 	CharCode** C = traverse_tree(tree);
 
-	unsigned int ldepth = tree_depth(tree->l);
-	unsigned int rdepth = tree_depth(tree->r);
-	printf("L: %u   R: %u\n", ldepth, rdepth);
+	print2DUtil(tree, 1);
+	for (int i = 0; i < 256; i++)
+	{
+		if (C[i]) {
+			printf("\n%c ", C[i]->token);
+			printle(C[i]->code, C[i]->fin_idx);
+		}
+	}
+	printf("\n");
+	
+	/* write_file_slowly(infile, outfile, C); */
 
 	free_tree(tree, 0);
 	free_charcodes(C);
