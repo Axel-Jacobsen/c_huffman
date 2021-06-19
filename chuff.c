@@ -133,6 +133,7 @@ Node* build_tree(uint64_t* freq_arr) {
 		Node** min_two = get_min_two(node_arr, max_idx);
 		// Create node w/ the two lowest as children
 		uint64_t count = min_two[0]->count + min_two[1]->count;
+
 		Node* N = init_node(min_two[0], min_two[1], 0, count, 0);
 		free(min_two);
 
@@ -188,6 +189,30 @@ CharCode** traverse_tree(Node* N) {
 	return md_arr;
 }
 
+void write_file_slowly(FILE* infile, FILE* outfile, CharCode** write_table) {
+	fseek(f, 0L, SEEK_END);
+	uint64_t flen = ftell(f);
+	fseek(f, 0L, SEEK_SET);
+
+	uint64_t write_byte_a = 0;
+	uint64_t write_byte_b = 0;
+	uint8_t write_indx = 0;
+
+	uint8_t c = 0;
+	// for token in infile
+	for (int i = 0; i < flen; i++) {
+		fread((void*)&c, 1, 1, f);
+		// load token into write_byte
+		// if fin_idx < 8:
+		//		read another byte, get charcode
+		//    load 8 - sum(fin_idx_i) bytes into a
+		//    load new charcode fin_idx into b
+		//    byte a = b
+	// write a to outfile
+	}
+	fseek(f, 0L, SEEK_SET);
+}
+
 void free_charcodes(CharCode** C) {
 	for (int i = 0; i < TOKEN_SET_LEN; i++) {
 		if (C[i])
@@ -216,26 +241,30 @@ int main(int argc, char *argv[]) {
 		exit(1);
 	}
 
-	printf("calculating char freqs...\n");
+	FILE *infile;
+	infile = fopen(argv[2], "r");
+	if (!infile) {
+		fprintf(stderr, "failed to open %s\n", argv[2]);
+		exit(1);
+	}
+
+	/* printf("calculating char freqs...\n"); */
 	uint64_t* freq_arr = calculate_char_freqs(infile);
 
-	printf("building tree...\n");
+	/* printf("building tree...\n"); */
 	// Build Huffman Tree with Frequencies
 	Node* tree = build_tree(freq_arr);
 
-	print2DUtil(tree, 1);
+
 	CharCode** C = traverse_tree(tree);
 
-	printf("freeing tree\n");
+	unsigned int ldepth = tree_depth(tree->l);
+	unsigned int rdepth = tree_depth(tree->r);
+	printf("L: %u   R: %u\n", ldepth, rdepth);
+
 	free_tree(tree, 0);
-
-	printf("freeing charcodes\n");
 	free_charcodes(C);
-
-	printf("freeing freq. arr.\n");
 	free(freq_arr);
-
-	printf("done\n");
 
 	// Write file with Huffman Tree Symbols
 	fclose(infile);
