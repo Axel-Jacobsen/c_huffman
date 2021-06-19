@@ -275,7 +275,7 @@ void free_tree(Node* N, int level) {
 }
 
 int main(int argc, char *argv[]) {
-	if (argc != 3) {
+	if (argc != 2) {
 		fprintf(stderr, "usage: ./huff <file>\n");
 		exit(1);
 	}
@@ -288,9 +288,10 @@ int main(int argc, char *argv[]) {
 	}
 
 	FILE *outfile;
-	outfile = fopen(argv[2], "w");
-	if (!infile) {
-		fprintf(stderr, "failed to open %s\n", argv[2]);
+	char* outfile_name = strcat(argv[1], ".pine");
+	outfile = fopen(outfile_name, "w");
+	if (!outfile) {
+		fprintf(stderr, "failed to open %s\n", outfile_name);
 		exit(1);
 	}
 
