@@ -9,7 +9,14 @@
 #include "chuff.h"
 
 #define TOKEN_LEN 8 // right now only a token len of 8 bits
-#define TOKEN_SET_LEN 1 << TOKEN_LEN
+#define TOKEN_SET_LEN (1 << TOKEN_LEN)
+#define WRITE_CHUNK_SIZE 80000
+
+/* todos:
+ * - multithread in calc_char_freqs
+ * - multithread in file writing?
+ */
+uint16_t num_chars = 0;
 
 
 uint64_t* calculate_char_freqs(FILE* f) {
@@ -32,9 +39,9 @@ uint64_t* calculate_char_freqs(FILE* f) {
 	return freq_arr;
 }
 
-uint64_t get_num_chars(uint64_t* freq_arr) {
-	uint64_t num_chars = 0;
-	for (uint64_t i = 0; i < TOKEN_SET_LEN; i++)
+uint8_t get_num_chars(uint64_t* freq_arr) {
+	uint8_t num_chars = 0;
+	for (uint8_t i = 0; i < TOKEN_SET_LEN - 1; i++)
 		if (freq_arr[i] != 0)
 			++num_chars;
 	return num_chars;
@@ -66,7 +73,7 @@ CharCode* init_charcode(uint64_t char_code, uint64_t code_len,	uint8_t token) {
 	return C;
 }
 
-Node** init_node_arr_from_chars(uint64_t* freq_arr, uint64_t num_chars) {
+Node** init_node_arr_from_chars(uint64_t* freq_arr, uint8_t num_chars) {
 	uint64_t j = 0;
 	Node** node_arr = (Node**) calloc(num_chars, sizeof(Node*));
 	for (uint64_t i = 0; i < TOKEN_SET_LEN; i++) {
@@ -122,7 +129,8 @@ Node** get_min_two(Node** node_arr, uint64_t max_idx) {
  * Come back to optimize this.
  */
 Node* build_tree(uint64_t* freq_arr) {
-	uint64_t max_idx = get_num_chars(freq_arr);
+	uint8_t max_idx = get_num_chars(freq_arr);
+	num_chars = max_idx;
 
 	Node* fin_node;
 	Node** node_arr = init_node_arr_from_chars(freq_arr, max_idx);
@@ -190,20 +198,30 @@ CharCode** traverse_tree(Node* N) {
 	return md_arr;
 }
 
+
+void write_charcode(FILE* outfile, CharCode* c) {
+	/* write to file <1:char><1:num bits in tree code><x:tree code>
+	 * to current position in outfile
+	 */
+	fwrite(&c->token, 1, 1, outfile);
+	fwrite(&c->code_len, 1, 1, outfile);
+	uint8_t num_code_bytes = (c->code_len - 1) / 8 + 1;
+	fwrite(&c->code, num_code_bytes, 1, outfile);
+}
+
+
 void write_to_file(FILE* infile, FILE* outfile, CharCode** write_table) {
 	// MSB of byte is the first instruction (i.e. left/right instruction)
-	printf("starting write_to_file\n");
 	fseek(infile, 0L, SEEK_END);
 	uint64_t flen = ftell(infile);
 	fseek(infile, 0L, SEEK_SET);
 
-	/* Write to the file in chunks of 8 kb (8 bytes per u64, 1024 of)
-	 * write_chunk is the chunk of mem that gets written each time.
-	 * chunk_idx is the index of the write_chunk array that is being written to.
-	 * int_idx is the index of the uint64_t (given by write_chunk[chunk_idx]) that hasn't
-	 * been written to yet.
-	 */
-	uint64_t* write_chunk = (uint64_t*)calloc(1024, sizeof(uint64_t));
+	// Write to the file in chunks of 8 kb (8 bytes per u64, 1024 of)
+	// write_chunk is the chunk of mem that gets written each time.
+	// chunk_idx is the index of the write_chunk array that is being written to.
+	// int_idx is the index of the uint64_t (given by write_chunk[chunk_idx]) that hasn't
+	// been written to yet.
+	uint64_t* write_chunk = (uint64_t*)calloc(WRITE_CHUNK_SIZE, sizeof(uint64_t));
 	unsigned int chunk_idx = 0;
 	int8_t int_idx = 0;
 
@@ -223,7 +241,7 @@ void write_to_file(FILE* infile, FILE* outfile, CharCode** write_table) {
 	uint8_t tail_padding_zeros;
 
 	for (;;) {
-		printf("%llu / %llu     chunk_idx: %u int_idx: %u\n", infile_pos, flen, chunk_idx, int_idx);
+		printf("%llu / %llu     code_len: %llu chunk_idx: %u int_idx: %u\n", infile_pos, flen, code_len, chunk_idx, int_idx);
 		write_chunk[chunk_idx] |= code >> int_idx;
 		int_idx += code_len;
 
@@ -236,33 +254,41 @@ void write_to_file(FILE* infile, FILE* outfile, CharCode** write_table) {
 			int_idx = 0;
 		} else {// load another char
 			if (infile_pos == flen) {
-				// if we are out of chars and here, we write 
+				// if we are out of chars and here, we write and are finished!
 				fwrite(write_chunk, sizeof(uint64_t), chunk_idx, outfile);
-				tail_padding_zeros = 64 - int_idx;
+				tail_padding_zeros = 64 - int_idx; // not actually zeros, but just junk
 				break;
 			}
+			// load a char here
 			fread((void*)&c, 1, 1, infile);
 			infile_pos++;
 			charcode = write_table[c];
 			code = charcode->code;
 			code_len = charcode->code_len;
 		}
-		if (chunk_idx == 1024) { // this chunk is full
+		if (chunk_idx == WRITE_CHUNK_SIZE) { // this chunk is full
 			// write and reset write_chunk, set chunk_idx to 0
 			chunk_idx = 0;
-			fwrite(write_chunk, sizeof(uint64_t), 1024, outfile);
-			for (int i = 0; i < 1024; i++) write_chunk[i] = 0;
+			fwrite(write_chunk, sizeof(uint64_t), WRITE_CHUNK_SIZE, outfile);
 		}
 	}
+	free(write_chunk);
 	fseek(infile, 0L, SEEK_SET);
 	fseek(outfile, 0L, SEEK_SET);
 	// write header (i.e. write table, etc);
+	printf("number of padding zeros: %u\n", tail_padding_zeros);
+
+	fwrite(&tail_padding_zeros, sizeof(uint8_t), 1, outfile);
+	fwrite(&num_chars, sizeof(uint8_t), 1, outfile);
+	for (int i = 0; i < 256; i++) {
+		if (write_table[i])
+			write_charcode(outfile, write_table[i]);
+	}
 }
 
 void free_charcodes(CharCode** C) {
 	for (int i = 0; i < TOKEN_SET_LEN; i++) {
-		if (C[i])
-			free(C[i]);
+		if (C[i]) free(C[i]);
 	}
 }
 
@@ -304,7 +330,7 @@ int main(int argc, char *argv[]) {
 
 	CharCode** C = traverse_tree(tree);
 
-  write_to_file(infile, outfile, C);
+	write_to_file(infile, outfile, C);
 
 	free_tree(tree, 0);
 	free_charcodes(C);

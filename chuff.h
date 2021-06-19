@@ -1,3 +1,5 @@
+// tyepdefs, will be in chuff.c by end
+
 typedef _Bool bool;
 
 typedef struct Node {
@@ -13,6 +15,8 @@ typedef struct CharCode {
 	uint8_t token;
 } CharCode;
 
+
+// Printing functions which are invaluable for debugging
 
 void printle(uint64_t v, uint64_t max_idx) {
 	for (uint64_t j = 64; j > 64 - max_idx; j--) {
