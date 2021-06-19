@@ -275,9 +275,15 @@ void write_to_file(FILE* infile, FILE* outfile, CharCode** write_table) {
 	free(write_chunk);
 	fseek(infile, 0L, SEEK_SET);
 	fseek(outfile, 0L, SEEK_SET);
-	// write header (i.e. write table, etc);
-	printf("number of padding zeros: %u\n", tail_padding_zeros);
 
+	// write header - tells decoder how to read file
+	// consists of
+	//	<1 byte: number of bits padding end of file>
+	//	<1 byte: N = number of unique symbols in compressed file>
+	//	<N bytes: <SYMBOL>> where
+	//		SYMBOL = <symbol (1 byte) : \
+	//						  # bits of code in tree (1 byte) : \
+	//						  code (# of bits, plus padding to make it bytes)>
 	fwrite(&tail_padding_zeros, sizeof(uint8_t), 1, outfile);
 	fwrite(&num_chars, sizeof(uint8_t), 1, outfile);
 	for (int i = 0; i < 256; i++) {
