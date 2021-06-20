@@ -61,13 +61,13 @@ Node* init_node(Node* n1, Node* n2, uint8_t tkn, uint64_t cnt, bool is_leaf) {
 	return (Node*) N;
 }
 
-CharCode* init_charcode(uint64_t char_code, uint64_t code_len,	uint8_t token) {
+CharCode* init_charcode(uint64_t code, uint8_t code_len,	uint8_t token) {
 	CharCode* C = (CharCode*) malloc(sizeof(CharCode));
 	if (!C) {
 		printf("failure initializing CharCode: %s\n", strerror(errno));
 		exit(1);
 	}
-	C->code = char_code;
+	C->code = code;
 	C->code_len = code_len;
 	C->token = token;
 	return C;
@@ -168,7 +168,6 @@ unsigned int tree_depth(Node* N) {
 }
 
 void _traverse(Node* N, CharCode* cur_cmprs, CharCode** write_table) {
-	// add is_leaf back to node
 	if (N->is_leaf) {
 		cur_cmprs->token = N->token;
 		write_table[N->token] = cur_cmprs;
@@ -240,17 +239,31 @@ void write_to_file(FILE* infile, FILE* outfile, CharCode** write_table) {
 
 	uint8_t tail_padding_zeros;
 
+	// write header - tells decoder how to read file
+	// consists of
+	//	<1 byte: number of bits padding end of file>
+	//	<1 byte: N = number of unique symbols in compressed file>
+	//	<N bytes: <SYMBOL>> where
+	//		SYMBOL = <symbol (1 byte) : \
+	//						  # bits of code in tree (1 byte) : \
+	//						  code (# of bits, plus padding to make it bytes)>
+	fwrite(&tail_padding_zeros, sizeof(uint8_t), 1, outfile);
+	fwrite(&num_chars, sizeof(uint8_t), 1, outfile);
+	for (int i = 0; i < 256; i++) {
+		if (write_table[i])
+			write_charcode(outfile, write_table[i]);
+	}
+
 	for (;;) {
-		printf("%llu / %llu     code_len: %llu chunk_idx: %u int_idx: %u\n", infile_pos, flen, code_len, chunk_idx, int_idx);
 		write_chunk[chunk_idx] |= code >> int_idx;
 		int_idx += code_len;
 
 		if (int_idx >= 63) {
 			// overflow on charcode, increment chunk_idx and prepare
 			// chunk_idx/code/code_len/int_idx for next write
-			chunk_idx++;
 			code = code << (code_len - int_idx - 63);
 			code_len = int_idx - 63;
+			chunk_idx++;
 			int_idx = 0;
 		} else {// load another char
 			if (infile_pos == flen) {
@@ -273,24 +286,54 @@ void write_to_file(FILE* infile, FILE* outfile, CharCode** write_table) {
 		}
 	}
 	free(write_chunk);
-	fseek(infile, 0L, SEEK_SET);
-	fseek(outfile, 0L, SEEK_SET);
+}
 
-	// write header - tells decoder how to read file
-	// consists of
-	//	<1 byte: number of bits padding end of file>
-	//	<1 byte: N = number of unique symbols in compressed file>
-	//	<N bytes: <SYMBOL>> where
-	//		SYMBOL = <symbol (1 byte) : \
-	//						  # bits of code in tree (1 byte) : \
-	//						  code (# of bits, plus padding to make it bytes)>
-	fwrite(&tail_padding_zeros, sizeof(uint8_t), 1, outfile);
-	fwrite(&num_chars, sizeof(uint8_t), 1, outfile);
-	for (int i = 0; i < 256; i++) {
-		if (write_table[i])
-			write_charcode(outfile, write_table[i]);
+/* Decode takes a .pine file and creates the decoded file
+ *
+ * consists of
+ *	<1 byte: number of bits padding end of file>
+ * 	<1 byte: N = number of unique symbols in compressed file>
+ * 	<N bytes: <SYMBOL>> where
+ * 		SYMBOL = <symbol (1 byte) : \
+ *					# bits of code in tree (1 byte) : \
+ *					code (# of bits, plus padding to make it bytes)>
+ *
+ */
+void decode(FILE* encoded_fh, FILE* decoded_fh) {
+	// read header
+	uint8_t tail_padding;
+	uint8_t num_symbols;
+	fseek(encoded_fh, 0L, SEEK_SET);
+	fread(&tail_padding, 1, 1, encoded_fh);
+	fread(&num_symbols, 1, 1, encoded_fh);
+
+	CharCode** decoding_charcodes = (CharCode**) calloc(TOKEN_SET_LEN, sizeof(CharCode*));
+	if (!decoding_charcodes) {
+		fprintf(stderr, "failed to allocate\n");
+		exit(1);
+	}
+
+	/* CharCode* first_charcode = init_charcode(0, 0, 0); */
+	uint8_t c;
+	uint8_t code_len;
+	uint64_t code;
+
+	for (uint8_t i = 0; i < num_symbols; i++) {
+		// symbol token
+		fread(&c, 1, 1, encoded_fh);
+		// # bits
+		fread(&code_len, 1, 1, encoded_fh);
+		// code
+		uint8_t num_code_bytes = (code_len - 1) / 8 + 1;
+		code = 0;
+		fread(&code, num_code_bytes, 1, encoded_fh);
+		code <<= (64 - code_len);
+		printf("%d %d %llX\n", code_len, num_code_bytes, code);
+		CharCode* CC = init_charcode(code, num_code_bytes, c);
+		decoding_charcodes[c] = CC;
 	}
 }
+
 
 void free_charcodes(CharCode** C) {
 	for (int i = 0; i < TOKEN_SET_LEN; i++) {
@@ -343,5 +386,9 @@ int main(int argc, char *argv[]) {
 	free(freq_arr);
 
 	// Write file with Huffman Tree Symbols
+
+	outfile = fopen(outfile_name, "r");
+	decode(outfile, infile);
+
 	fclose(infile);
 }
