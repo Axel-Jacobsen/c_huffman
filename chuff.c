@@ -174,11 +174,11 @@ void _traverse(Node* N, CharCode* cur_cmprs, CharCode** write_table) {
 		return;
 	}
 	CharCode* left_charcode = init_charcode(
-			cur_cmprs->code | (uint64_t)0 << (63 - cur_cmprs->code_len),
+			cur_cmprs->code | ((uint64_t)0 << (63 - cur_cmprs->code_len)),
 			cur_cmprs->code_len + 1,
 			0);
 	CharCode* right_charcode = init_charcode(
-			cur_cmprs->code | (uint64_t)1 << (63 - cur_cmprs->code_len),
+			cur_cmprs->code | ((uint64_t)1 << (63 - cur_cmprs->code_len)),
 			cur_cmprs->code_len + 1,
 			0);
 	free(cur_cmprs);
@@ -205,11 +205,23 @@ void write_charcode(FILE* outfile, CharCode* c) {
 	fwrite(&c->token, 1, 1, outfile);
 	fwrite(&c->code_len, 1, 1, outfile);
 	uint8_t num_code_bytes = (c->code_len - 1) / 8 + 1;
-	fwrite(&c->code, num_code_bytes, 1, outfile);
+	uint64_t code = c->code >> (64 - c->code_len);
+	fwrite(&code, num_code_bytes, 1, outfile);
 }
 
 
 void write_to_file(FILE* infile, FILE* outfile, CharCode** write_table) {
+	// FILE FORMAT
+	//	HEADER - tells decoder how to read file
+	//		consists of
+	//		<1 byte: N = number of unique symbols in compressed file>
+	//		<N bytes: <SYMBOL>> where
+	//				SYMBOL = <symbol (1 byte) : \
+	//						  # depth of symbol in tree (1 byte) : \
+	//						  code (# of bits, plus padding to make it bytes)>
+	//	CONTENTS - encoded symbols in file
+	//	TAIL
+	//		<1 byte: number of bits padding end of file>
 	// MSB of byte is the first instruction (i.e. left/right instruction)
 	fseek(infile, 0L, SEEK_END);
 	uint64_t flen = ftell(infile);
@@ -234,25 +246,14 @@ void write_to_file(FILE* infile, FILE* outfile, CharCode** write_table) {
 	// these from the CharCode object allows generalization in writing
 	// accross write_chunk elements. I.e., each time we add to a write_chunk,
 	// we add the most significant code_len bits of code.
+	uint8_t tail_padding_zeros;
 	uint64_t code = charcode->code;
 	uint64_t code_len = charcode->code_len;
 
-	uint8_t tail_padding_zeros;
-
-	// write header - tells decoder how to read file
-	// consists of
-	//	<1 byte: number of bits padding end of file>
-	//	<1 byte: N = number of unique symbols in compressed file>
-	//	<N bytes: <SYMBOL>> where
-	//		SYMBOL = <symbol (1 byte) : \
-	//						  # bits of code in tree (1 byte) : \
-	//						  code (# of bits, plus padding to make it bytes)>
-	fwrite(&tail_padding_zeros, sizeof(uint8_t), 1, outfile);
 	fwrite(&num_chars, sizeof(uint8_t), 1, outfile);
-	for (int i = 0; i < 256; i++) {
+	for (int i = 0; i < 256; i++)
 		if (write_table[i])
 			write_charcode(outfile, write_table[i]);
-	}
 
 	for (;;) {
 		write_chunk[chunk_idx] |= code >> int_idx;
@@ -261,7 +262,7 @@ void write_to_file(FILE* infile, FILE* outfile, CharCode** write_table) {
 		if (int_idx >= 63) {
 			// overflow on charcode, increment chunk_idx and prepare
 			// chunk_idx/code/code_len/int_idx for next write
-			code = code << (code_len - int_idx - 63);
+			code = code << (code_len - int_idx - 64);
 			code_len = int_idx - 63;
 			chunk_idx++;
 			int_idx = 0;
@@ -285,55 +286,111 @@ void write_to_file(FILE* infile, FILE* outfile, CharCode** write_table) {
 			fwrite(write_chunk, sizeof(uint64_t), WRITE_CHUNK_SIZE, outfile);
 		}
 	}
+	fwrite(&tail_padding_zeros, sizeof(uint8_t), 1, outfile);
 	free(write_chunk);
 }
 
-/* Decode takes a .pine file and creates the decoded file
- *
- * consists of
- *	<1 byte: number of bits padding end of file>
- * 	<1 byte: N = number of unique symbols in compressed file>
- * 	<N bytes: <SYMBOL>> where
- * 		SYMBOL = <symbol (1 byte) : \
- *					# bits of code in tree (1 byte) : \
- *					code (# of bits, plus padding to make it bytes)>
- *
+/* given the main node N, the token (i.e. symbol), and
+ * the code which defines the new node's position in
+ * the tree.
  */
-void decode(FILE* encoded_fh, FILE* decoded_fh) {
-	// read header
-	uint8_t tail_padding;
-	uint8_t num_symbols;
-	fseek(encoded_fh, 0L, SEEK_SET);
-	fread(&tail_padding, 1, 1, encoded_fh);
-	fread(&num_symbols, 1, 1, encoded_fh);
-
-	CharCode** decoding_charcodes = (CharCode**) calloc(TOKEN_SET_LEN, sizeof(CharCode*));
-	if (!decoding_charcodes) {
-		fprintf(stderr, "failed to allocate\n");
-		exit(1);
+void reconstruct_tree(Node* N, uint8_t token, uint8_t code_len, uint64_t code) {
+	Node* cur_node = N;
+	for (uint8_t i = 64; i > 64 - code_len; i--) {
+		bool is_leaf = i == (64 - code_len + 1);
+		uint64_t shift = (uint64_t) 1 << (i - 1);
+		if ((code & shift) == shift) {
+			if (cur_node->r == NULL)
+				cur_node->r = init_node(NULL, NULL, token, 0, is_leaf);
+			cur_node = cur_node->r;
+		} else {
+			if (cur_node->l == NULL)
+				cur_node->l = init_node(NULL, NULL, token, 0, is_leaf);
+			cur_node = cur_node->l;
+		}
 	}
+}
 
-	/* CharCode* first_charcode = init_charcode(0, 0, 0); */
-	uint8_t c;
-	uint8_t code_len;
+// FILE FORMAT
+//	HEADER - tells decoder how to read file
+//		consists of
+//		<1 byte: N = number of unique symbols in compressed file>
+//		<N bytes: <SYMBOL>> where
+//				SYMBOL = <symbol (1 byte) : \
+//						  # of bits of code in tree (1 byte) : \
+//						  code (# of bits, plus padding to make it bytes)>
+//	CONTENTS - encoded symbols in file
+//	TAIL
+//		<1 byte: number of bits padding end of file>
+void decode(FILE* encoded_fh, FILE* decoded_fh) {
+	fseek(encoded_fh, 0L, SEEK_END);
+	uint64_t end_pos = ftell(encoded_fh);
+	fseek(encoded_fh, 0L, SEEK_SET);
+
+	// read header
+	uint8_t num_symbols;
+	fread(&num_symbols, 1, 1, encoded_fh);
+	printf("NUM SYBOLS %u\n", num_symbols);
+
+	// read symbols
+	uint8_t token, code_len;
 	uint64_t code;
-
+	Node* root = init_node(NULL, NULL, 0, 0, 0);
 	for (uint8_t i = 0; i < num_symbols; i++) {
 		// symbol token
-		fread(&c, 1, 1, encoded_fh);
+		fread(&token, 1, 1, encoded_fh);
 		// # bits
 		fread(&code_len, 1, 1, encoded_fh);
 		// code
 		uint8_t num_code_bytes = (code_len - 1) / 8 + 1;
+		printf("NUM BYTES %u should be 1\n", num_code_bytes);
+
 		code = 0;
 		fread(&code, num_code_bytes, 1, encoded_fh);
-		code <<= (64 - code_len);
-		printf("%d %d %llX\n", code_len, num_code_bytes, code);
-		CharCode* CC = init_charcode(code, num_code_bytes, c);
-		decoding_charcodes[c] = CC;
-	}
-}
+		printle(code, 64); printf("\n");
 
+		code <<= (64 - code_len);
+		printle(code, 64); printf("\n");
+
+		reconstruct_tree(root, token, code_len, code);
+	}
+	print2DUtil(root, 1);
+	// read actual file data
+	uint64_t cur_file_pos = ftell(encoded_fh);
+	uint8_t byte;
+	Node* N = root;
+	for (; cur_file_pos < end_pos - 1; cur_file_pos++) {
+		printf("Cur file pos %llu\n", cur_file_pos);
+		// read byte
+		fread(&byte, 1, 1, encoded_fh);
+		// for each bit in byte, move in tree
+		for (int i = 7; i >= 0; i--) {
+			printle_byte(byte, 8);
+			printf(" %d ", i);
+			uint8_t shift = 1 << i;
+			if ((byte & shift) == shift) {
+				N = N->r;
+				printf("r\n");
+				if (N == NULL)
+					printf("N->r is NULL\n");
+			} else {
+				N = N->l;
+				printf("l\n");
+				if (N == NULL)
+					printf("N->l is NULL\n");
+			}
+
+			printf("N IS ALSO LEAF %d \n", N->is_leaf);
+			if (N->is_leaf) {
+				fwrite(&N->token, 1, 1, decoded_fh);
+				N = root;
+			}
+		}
+	}
+
+	uint8_t tail_padding;
+	fread(&tail_padding, 1, 1, encoded_fh);
+}
 
 void free_charcodes(CharCode** C) {
 	for (int i = 0; i < TOKEN_SET_LEN; i++) {
@@ -370,14 +427,18 @@ int main(int argc, char *argv[]) {
 		exit(1);
 	}
 
-	/* printf("calculating char freqs...\n"); */
 	uint64_t* freq_arr = calculate_char_freqs(infile);
 
-	/* printf("building tree...\n"); */
-	// Build Huffman Tree with Frequencies
 	Node* tree = build_tree(freq_arr);
-
+	print2DUtil(tree, 1);
 	CharCode** C = traverse_tree(tree);
+
+	FILE* decoded;
+	decoded = fopen("./out/out.txt", "w");
+	if (!decoded) {
+		fprintf(stderr, "failed to open decoded\n");
+		exit(1);
+	}
 
 	write_to_file(infile, outfile, C);
 
@@ -386,9 +447,9 @@ int main(int argc, char *argv[]) {
 	free(freq_arr);
 
 	// Write file with Huffman Tree Symbols
-
+	fclose(outfile);
 	outfile = fopen(outfile_name, "r");
-	decode(outfile, infile);
+	decode(outfile, decoded);
 
 	fclose(infile);
 }

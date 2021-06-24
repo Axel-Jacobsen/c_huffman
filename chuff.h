@@ -16,7 +16,7 @@ typedef struct CharCode {
 } CharCode;
 
 
-// Printing functions which are invaluable for debugging
+// Printing functions which are valuable for debugging
 
 void printle(uint64_t v, uint64_t max_idx) {
 	for (uint64_t j = 64; j > 64 - max_idx; j--) {
@@ -24,6 +24,21 @@ void printle(uint64_t v, uint64_t max_idx) {
 		printf("%d", (bool)((v & shift) == shift));
 	}
 }
+
+void printbe(uint64_t v, uint64_t max_idx) {
+	for (uint64_t j = 0; j < max_idx; j++) {
+		printf("%llu", v & 1);
+		v = v >> 1;
+	}
+}
+
+void printle_byte(uint64_t v, uint64_t max_idx) {
+	for (uint64_t j = 8; j > 8 - max_idx; j--) {
+		uint64_t shift = (uint64_t) 1 << (j - 1);
+		printf("%d", (bool)((v & shift) == shift));
+	}
+}
+
 
 void print_padding (int n) {
 	for (int i = 0; i < n; i++) putchar('\t');
@@ -49,17 +64,10 @@ void print2DUtil(Node* root, int space) {
 		printf(" ");
 
 	/* printle(root->token, 8); */
-	printf("%c", root->token);
-	printf(": %llu\n", root->count);
+	printf("%X", root->token);
+	printf(": %llu, leaf:%d\n", root->count, root->is_leaf);
 
 	// Process left child
 	print2DUtil(root->l, space);
-}
-
-void printbe(uint64_t v, uint64_t max_idx) {
-	for (uint64_t j = 0; j < max_idx; j++) {
-		printf("%llu", v & 1);
-		v = v >> 1;
-	}
 }
 
