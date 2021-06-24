@@ -32,8 +32,8 @@ void printbe(uint64_t v, uint64_t max_idx) {
 	}
 }
 
-void printle_byte(uint64_t v, uint64_t max_idx) {
-	for (uint64_t j = 8; j > 8 - max_idx; j--) {
+void printle_byte(uint64_t v) {
+	for (uint64_t j = 8; j > 0; j--) {
 		uint64_t shift = (uint64_t) 1 << (j - 1);
 		printf("%d", (bool)((v & shift) == shift));
 	}
