@@ -7,10 +7,10 @@
 #include <errno.h>
 #include <math.h>
 
-/* #include "chuff.h" */
+#include "chuff.h"
 
 #define TOKEN_LEN 8 // right now only a token len of 8 bits
-#define TOKEN_SET_LEN (1 << TOKEN_LEN)
+#define TOKEN_SET_LEN ((uint8_t)1 << TOKEN_LEN)
 #define WRITE_CHUNK_SIZE 8000
 #define NUM_BYTES(bits) ((bits - 1) / 8 + 1)
 
@@ -24,22 +24,6 @@
  * - multithread in file writing?
  * - safe calloc/malloc
  */
-typedef _Bool bool;
-
-typedef struct Node {
-	struct Node * l, * r;
-	uint64_t count;
-	uint8_t token;
-	bool is_leaf;
-} Node;
-
-typedef struct CharCode {
-	uint64_t code;
-	uint8_t code_len;
-	uint8_t token;
-} CharCode;
-
-
 uint16_t num_chars = 0;
 
 uint64_t* calculate_char_freqs(FILE* f) {
@@ -62,11 +46,13 @@ uint64_t* calculate_char_freqs(FILE* f) {
 	return freq_arr;
 }
 
-uint8_t get_num_chars(uint64_t* freq_arr) {
-	uint8_t num_chars = 0;
-	for (uint8_t i = 0; i < TOKEN_SET_LEN - 1; i++)
+uint16_t get_num_chars(uint64_t* freq_arr) {
+	uint16_t num_chars = 0;
+	for (int i = 0; i < TOKEN_SET_LEN; i++) {
+		printf("i = %d freq_arr[i] = %llu\n", i, freq_arr[i]);
 		if (freq_arr[i] != 0)
 			++num_chars;
+	}
 	return num_chars;
 }
 
@@ -96,7 +82,7 @@ CharCode* init_charcode(uint64_t code, uint8_t code_len,	uint8_t token) {
 	return C;
 }
 
-Node** init_node_arr_from_chars(uint64_t* freq_arr, uint8_t num_chars) {
+Node** init_node_arr_from_chars(uint64_t* freq_arr, uint16_t num_chars) {
 	uint64_t j = 0;
 	Node** node_arr = (Node**) calloc(num_chars, sizeof(Node*));
 	for (uint64_t i = 0; i < TOKEN_SET_LEN; i++) {
@@ -152,7 +138,9 @@ Node** get_min_two(Node** node_arr, uint64_t max_idx) {
  * Come back to optimize this.
  */
 Node* build_tree(uint64_t* freq_arr) {
-	uint8_t max_idx = get_num_chars(freq_arr);
+	uint16_t max_idx = get_num_chars(freq_arr);
+	printf("BUILD TREE\n");
+	printf("	max_idx = %d\n", max_idx);
 	num_chars = max_idx;
 
 	Node* fin_node;
@@ -160,11 +148,14 @@ Node* build_tree(uint64_t* freq_arr) {
 
 	// when n == 1, return node in array
 	while (max_idx > 1) {
+		printf("	max_idx = %d\n", max_idx);
 		// Find two lowest value nodes in node arr, w/ len number giving max len, and their indicies
+		printf("min two\n");
 		Node** min_two = get_min_two(node_arr, max_idx);
 		// Create node w/ the two lowest as children
 		uint64_t count = min_two[0]->count + min_two[1]->count;
 
+		printf("init node\n");
 		Node* N = init_node(min_two[0], min_two[1], 0, count, 0);
 		free(min_two);
 
@@ -213,6 +204,7 @@ unsigned int tree_depth(Node* N) {
 
 void _traverse(Node* N, CharCode* cur_cmprs, CharCode** write_table) {
 	if (N->is_leaf) {
+		/* printf("TRAVERSE TOKEN "); printle_byte(N->token); printf("\n"); */
 		cur_cmprs->token = N->token;
 		write_table[N->token] = cur_cmprs;
 		return;
@@ -236,11 +228,26 @@ CharCode** traverse_tree(Node* N) {
 		fprintf(stderr, "failed to allocate\n");
 		exit(1);
 	}
+	printf("	init charcode\n");
 	CharCode* first_charcode = init_charcode(0, 0, 0);
+	printf("	starting traverse...\n");
 	_traverse(N, first_charcode, md_arr);
 	return md_arr;
 }
 
+void free_charcodes(CharCode** C) {
+	for (int i = 0; i < TOKEN_SET_LEN; i++) {
+		if (C[i]) free(C[i]);
+	}
+}
+
+// i love recursion
+void free_tree(Node* N) {
+	if (N == NULL) return;
+	free_tree(N->r);
+	free_tree(N->l);
+	free(N);
+}
 
 void write_charcode(FILE* outfile, CharCode* c) {
 	/* write to file <1:char><1:num bits in tree code><x:tree code>
@@ -281,12 +288,13 @@ void encode(FILE* infile, FILE* outfile, CharCode** write_table) {
 
 	// start of file writing
 	// first, write the number of chars
-	fwrite(&num_chars, sizeof(uint8_t), 1, outfile);
+	fwrite(&num_chars, sizeof(uint16_t), 1, outfile);
 
 	// we only need the code and code_len, and seperating
 	// these from the CharCode object allows generalization in writing
 	// accross write_chunk elements. I.e., each time we add to a write_chunk,
 	// we add the most significant code_len bits of code.
+	printf("  writing charcodes...\n");
 	for (int i = 0; i < 256; i++)
 		if (write_table[i])
 			write_charcode(outfile, write_table[i]);
@@ -299,6 +307,7 @@ void encode(FILE* infile, FILE* outfile, CharCode** write_table) {
 	uint8_t tail_padding_zeros = 0;
 	uint64_t code = write_table[c]->code;
 	uint64_t code_len = write_table[c]->code_len;
+	printf("  writing file...\n");
 	for (;;) {
 		write_chunk[chunk_idx] |= code >> int_idx;
 		int_idx += code_len;
@@ -306,12 +315,14 @@ void encode(FILE* infile, FILE* outfile, CharCode** write_table) {
 		if (int_idx >= 63) {
 			// overflow on charcode, increment chunk_idx and prepare
 			// chunk_idx/code/code_len/int_idx for next write
+			printf("  int_idx overflow...\n");
 			code = code << (code_len - int_idx - 64);
 			code_len = int_idx - 64;
 			chunk_idx++;
 			int_idx = 0;
 		} else {// load another char
 			if (infile_pos == flen) {
+				printf("  finishing write\n");
 				// if we are out of chars and here, we write and are finished!
 				// set bytes to big endian order
 				for (int i = 0; i < chunk_idx+1; i++) {
@@ -326,22 +337,34 @@ void encode(FILE* infile, FILE* outfile, CharCode** write_table) {
 
 				fwrite(write_chunk, sizeof(uint64_t), chunk_idx, outfile);
 				fwrite(&tail_chunk, 1, num_bytes_to_write, outfile);
+				printf("  finished write\n");
 				break;
 			}
+			printf("  loading char... ");
 			// load a char here
 			fread(&c, 1, 1, infile);
 			infile_pos++;
+			/* printle_byte(c); */
+			/* printf("\n"); */
+			/* printf("i am seg faulting on c?!?!\n"); */
+			/* printf("write_table[%d] == NULL\n", c); */
+			/* CharCode* r = write_table[c]; */
+			/* printf("%d\n", r == NULL); */
+			/* printf("hm\n"); */
+			/* printf("write_table[%d] == NULL: %d\n", c, write_table[c] == NULL); */
 			code = write_table[c]->code;
 			code_len = write_table[c]->code_len;
+			printf("  done loading char\n");
 		}
+		// write and reset write_chunk, set chunk_idx to 0
 		if (chunk_idx == WRITE_CHUNK_SIZE) { // this chunk is full
-			// write and reset write_chunk, set chunk_idx to 0
+			printf("  flipping over write chunk size\n");
 			// set bytes to big endian order
 			for (int i = 0; i < chunk_idx+1; i++) {
-				write_chunk[i] = htonll(write_chunk[i]);
+				/* write_chunk[i] = htonll(write_chunk[i]); */
 			}
-			chunk_idx = 0;
 			fwrite(write_chunk, sizeof(uint64_t), WRITE_CHUNK_SIZE, outfile);
+			chunk_idx = 0;
 		}
 	}
 	fwrite(&tail_padding_zeros, sizeof(uint8_t), 1, outfile);
@@ -370,14 +393,14 @@ void decode(FILE* encoded_fh, FILE* decoded_fh) {
 	fseek(encoded_fh, 0L, SEEK_SET);
 
 	// read header
-	uint8_t num_symbols;
-	fread(&num_symbols, 1, 1, encoded_fh);
+	uint16_t num_symbols;
+	fread(&num_symbols, 2, 1, encoded_fh);
 
 	// read symbols
 	uint8_t token, code_len;
 	uint64_t code;
 	Node* root = init_node(NULL, NULL, 0, 0, 0);
-	for (uint8_t i = 0; i < num_symbols; i++) {
+	for (uint16_t i = 0; i < num_symbols; i++) {
 		// symbol token
 		fread(&token, 1, 1, encoded_fh);
 		// # bits
@@ -416,20 +439,7 @@ void decode(FILE* encoded_fh, FILE* decoded_fh) {
 			}
 		}
 	}
-}
-
-void free_charcodes(CharCode** C) {
-	for (int i = 0; i < TOKEN_SET_LEN; i++) {
-		if (C[i]) free(C[i]);
-	}
-}
-
-// i love recursion
-void free_tree(Node* N, int level) {
-	if (N == NULL) return;
-	free_tree(N->r, level+1);
-	free_tree(N->l, level+1);
-	free(N);
+	free_tree(root);
 }
 
 int main(int argc, char *argv[]) {
@@ -453,10 +463,17 @@ int main(int argc, char *argv[]) {
 		exit(1);
 	}
 
+	printf("calculating char freqs...\n");
 	uint64_t* freq_arr = calculate_char_freqs(infile);
+	printf("freq_arr[0xff] = %llu\n", freq_arr[0xff]);
 
+	printf("build tree...\n");
 	Node* tree = build_tree(freq_arr);
-
+	printf("%llu\n", tree->count);
+	printf("print tree\n");
+	print2DUtil(tree, 1);
+	printf("print tree\n");
+	printf("traverse tree...\n");
 	CharCode** C = traverse_tree(tree);
 
 	FILE* decoded;
@@ -466,16 +483,23 @@ int main(int argc, char *argv[]) {
 		exit(1);
 	}
 	
+	printf("encode...\n");
 	encode(infile, outfile, C);
 
-	free_tree(tree, 0);
+	printf("free tree...\n");
+	free_tree(tree);
+
+	printf("free charcodes...\n");
 	free_charcodes(C);
+
+	printf("free freq arr...\n");
 	free(freq_arr);
 
 	// Write file with Huffman Tree Symbols
 	fclose(outfile);
 	outfile = fopen(outfile_name, "r");
 
+	printf("decode...\n");
 	decode(outfile, decoded);
 
 	fclose(infile);
