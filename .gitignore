@@ -9,3 +9,5 @@ debug.txt
 test/testf
 
 *.pine
+
+out/out.txt

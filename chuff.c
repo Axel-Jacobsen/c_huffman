@@ -1,22 +1,40 @@
 #include <stdlib.h>
+#include <stdio.h>
 #include <stdint.h>
+#include <arpa/inet.h>
 #include <limits.h>
 #include <string.h>
-#include <stdio.h>
 #include <errno.h>
 #include <math.h>
 
-#include "chuff.h"
+/* #include "chuff.h" */
 
 #define TOKEN_LEN 8 // right now only a token len of 8 bits
 #define TOKEN_SET_LEN (1 << TOKEN_LEN)
 #define WRITE_CHUNK_SIZE 80000
 #define NUM_BYTES(bits) ((bits - 1) / 8 + 1)
 
-/* todos:
+/* improvements:
  * - multithread in calc_char_freqs
  * - multithread in file writing?
+ * - safe calloc/malloc
  */
+typedef _Bool bool;
+
+typedef struct Node {
+	struct Node * l, * r;
+	uint64_t count;
+	uint8_t token;
+	bool is_leaf;
+} Node;
+
+typedef struct CharCode {
+	uint64_t code;
+	uint8_t code_len;
+	uint8_t token;
+} CharCode;
+
+
 uint16_t num_chars = 0;
 
 uint64_t* calculate_char_freqs(FILE* f) {
@@ -50,7 +68,7 @@ uint8_t get_num_chars(uint64_t* freq_arr) {
 Node* init_node(Node* n1, Node* n2, uint8_t tkn, uint64_t cnt, bool is_leaf) {
 	Node* N = (Node*) malloc(sizeof(Node));
 	if (!N) {
-		printf("failure initializing Node: %s\n", strerror(errno));
+		fprintf(stderr, "failure initializing Node: %s\n", strerror(errno));
 		exit(1);
 	}
 	N->l = n1;
@@ -64,7 +82,7 @@ Node* init_node(Node* n1, Node* n2, uint8_t tkn, uint64_t cnt, bool is_leaf) {
 CharCode* init_charcode(uint64_t code, uint8_t code_len,	uint8_t token) {
 	CharCode* C = (CharCode*) malloc(sizeof(CharCode));
 	if (!C) {
-		printf("failure initializing CharCode: %s\n", strerror(errno));
+		fprintf(stderr, "failure initializing CharCode: %s\n", strerror(errno));
 		exit(1);
 	}
 	C->code = code;
@@ -106,7 +124,7 @@ Node** get_min_two(Node** node_arr, uint64_t max_idx) {
 
 	Node** lowest_pair = (Node**) calloc(2, sizeof(Node*));
 	if (!lowest_pair) {
-		printf("failure initializing node array in get_min_two: %s\n", strerror(errno));
+		fprintf(stderr, "failure initializing node array in get_min_two: %s\n", strerror(errno));
 		exit(1);
 	}
 	for (uint64_t i = 0; i < max_idx; i++) {
@@ -232,18 +250,12 @@ void encode(FILE* infile, FILE* outfile, CharCode** write_table) {
 	// int_idx is the index of the uint64_t (given by write_chunk[chunk_idx]) that hasn't
 	//   been written to yet.
 	uint64_t* write_chunk = (uint64_t*)calloc(WRITE_CHUNK_SIZE, sizeof(uint64_t));
-	unsigned int chunk_idx = 0;
+	uint64_t chunk_idx = 0;
 	int8_t int_idx = 0;
 
 	// start of file writing
 	// first, write the number of chars
 	fwrite(&num_chars, sizeof(uint8_t), 1, outfile);
-
-	// Start by loading a char from the infile
-	uint8_t c = 0;
-	uint64_t infile_pos = 1;
-	fread((void*)&c, 1, 1, infile);
-	CharCode* charcode = write_table[c];
 
 	// we only need the code and code_len, and seperating
 	// these from the CharCode object allows generalization in writing
@@ -253,9 +265,14 @@ void encode(FILE* infile, FILE* outfile, CharCode** write_table) {
 		if (write_table[i])
 			write_charcode(outfile, write_table[i]);
 
+	// Start by loading a char from the infile
+	uint8_t c = 0;
+	uint64_t infile_pos = 1;
+	fread(&c, 1, 1, infile);
+
 	uint8_t tail_padding_zeros = 0;
-	uint64_t code = charcode->code;
-	uint64_t code_len = charcode->code_len;
+	uint64_t code = write_table[c]->code;
+	uint64_t code_len = write_table[c]->code_len;
 	for (;;) {
 		write_chunk[chunk_idx] |= code >> int_idx;
 		int_idx += code_len;
@@ -270,32 +287,38 @@ void encode(FILE* infile, FILE* outfile, CharCode** write_table) {
 		} else {// load another char
 			if (infile_pos == flen) {
 				// if we are out of chars and here, we write and are finished!
-				// TODO: reduce the size of bytes to read so padding bytes is always less than a bit
-				// format of the final 
+				// set bytes to big endian order
+				for (int i = 0; i < chunk_idx+1; i++) {
+					write_chunk[i] = htonll(write_chunk[i]);
+				}
+				// doing simple math to reduce number of redundant bits to less than 8
 				uint8_t final_u64_num_junk_bits = 64 - int_idx;
 				uint8_t full_junk_bytes = NUM_BYTES(final_u64_num_junk_bits) - 1; // we can right shift the final byte by this many bytes
 				uint8_t num_bytes_to_write = 8 - full_junk_bytes;
 				tail_padding_zeros = final_u64_num_junk_bits - 8 * full_junk_bytes;
-				uint64_t tail_chunk = write_chunk[chunk_idx] >> (8 * full_junk_bytes);
-				fwrite(write_chunk, sizeof(uint64_t), chunk_idx-1, outfile);
+				uint64_t tail_chunk = write_chunk[chunk_idx]; //>> (8 * full_junk_bytes);
+
+				fwrite(write_chunk, sizeof(uint64_t), chunk_idx, outfile);
 				fwrite(&tail_chunk, 1, num_bytes_to_write, outfile);
 				break;
 			}
 			// load a char here
-			fread((void*)&c, 1, 1, infile);
+			fread(&c, 1, 1, infile);
 			infile_pos++;
-			charcode = write_table[c];
-			code = charcode->code;
-			code_len = charcode->code_len;
+			code = write_table[c]->code;
+			code_len = write_table[c]->code_len;
 		}
 		if (chunk_idx == WRITE_CHUNK_SIZE) { // this chunk is full
 			// write and reset write_chunk, set chunk_idx to 0
+			// set bytes to big endian order
+			for (int i = 0; i < chunk_idx+1; i++) {
+				write_chunk[i] = htonll(write_chunk[i]);
+			}
 			chunk_idx = 0;
 			fwrite(write_chunk, sizeof(uint64_t), WRITE_CHUNK_SIZE, outfile);
 		}
 	}
 	fwrite(&tail_padding_zeros, sizeof(uint8_t), 1, outfile);
-	printf("TAIL PADDING 0s writing %u\n", tail_padding_zeros);
 	free(write_chunk);
 }
 
@@ -349,31 +372,21 @@ void decode(FILE* encoded_fh, FILE* decoded_fh) {
 	uint8_t token, code_len;
 	uint64_t code;
 	Node* root = init_node(NULL, NULL, 0, 0, 0);
-	printf("nsyms: %u\n", num_symbols);
 	for (uint8_t i = 0; i < num_symbols; i++) {
 		// symbol token
-		printf("a\n");
 		fread(&token, 1, 1, encoded_fh);
 		// # bits
-		printf("b\n");
 		fread(&code_len, 1, 1, encoded_fh);
 		// code
-		printf("c\n");
 		uint8_t num_code_bytes = NUM_BYTES(code_len);
 
-		printf("d\n");
 		code = 0;
 		fread(&code, num_code_bytes, 1, encoded_fh);
 
-		printf("e\n");
 		code <<= (64 - code_len);
 
-		printf("f\n");
 		reconstruct_tree(root, token, code_len, code);
 	}
-	/* printf(" i strug? \n"); */
-	/* print2DUtil(root, 1); */
-	/* printf(" i strug \n"); */
 
 	// read actual file data
 	uint64_t cur_file_pos = ftell(encoded_fh);
@@ -381,28 +394,17 @@ void decode(FILE* encoded_fh, FILE* decoded_fh) {
 	uint8_t byte_valid_bits;
 	Node* N = root;
 	for (; cur_file_pos < end_pos - 1; cur_file_pos++) {
-		printf("Cur file pos %llu\n", cur_file_pos);
 		// read byte
 		fread(&byte, 1, 1, encoded_fh);
 		// for each bit in byte, move in tree
 		byte_valid_bits = cur_file_pos == end_pos - 2 ? tail_padding_zeros : 0;
 		for (int i = 7; i >= byte_valid_bits; i--) {
-			printle_byte(byte, 8);
-			printf(" %d ", i);
 			uint8_t shift = 1 << i;
-			if ((byte & shift) == shift) {
+			if ((byte & shift) == shift)
 				N = N->r;
-				printf("r\n");
-				if (N == NULL)
-					printf("N->r is NULL\n");
-			} else {
+			else
 				N = N->l;
-				printf("l\n");
-				if (N == NULL)
-					printf("N->l is NULL\n");
-			}
 
-			printf("N IS ALSO LEAF %d \n", N->is_leaf);
 			if (N->is_leaf) {
 				fwrite(&N->token, 1, 1, decoded_fh);
 				N = root;
@@ -449,7 +451,7 @@ int main(int argc, char *argv[]) {
 	uint64_t* freq_arr = calculate_char_freqs(infile);
 
 	Node* tree = build_tree(freq_arr);
-	print2DUtil(tree, 1);
+
 	CharCode** C = traverse_tree(tree);
 
 	FILE* decoded;
@@ -458,7 +460,7 @@ int main(int argc, char *argv[]) {
 		fprintf(stderr, "failed to open decoded\n");
 		exit(1);
 	}
-
+	
 	encode(infile, outfile, C);
 
 	free_tree(tree, 0);
@@ -468,6 +470,7 @@ int main(int argc, char *argv[]) {
 	// Write file with Huffman Tree Symbols
 	fclose(outfile);
 	outfile = fopen(outfile_name, "r");
+
 	decode(outfile, decoded);
 
 	fclose(infile);

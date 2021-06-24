@@ -64,7 +64,7 @@ void print2DUtil(Node* root, int space) {
 		printf(" ");
 
 	/* printle(root->token, 8); */
-	printf("%X", root->token);
+	printf("%02X", root->token);
 	printf(": %llu, leaf:%d\n", root->count, root->is_leaf);
 
 	// Process left child
