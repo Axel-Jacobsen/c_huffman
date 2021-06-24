@@ -172,6 +172,27 @@ Node* build_tree(uint64_t* freq_arr) {
 	return fin_node;
 }
 
+/* given the main node N, the token (i.e. symbol), and
+ * the code which defines the new node's position in
+ * the tree.
+ */
+void reconstruct_tree(Node* N, uint8_t token, uint8_t code_len, uint64_t code) {
+	Node* cur_node = N;
+	for (uint8_t i = 64; i > 64 - code_len; i--) {
+		bool is_leaf = i == (64 - code_len + 1);
+		uint64_t shift = (uint64_t) 1 << (i - 1);
+		if ((code & shift) == shift) {
+			if (cur_node->r == NULL)
+				cur_node->r = init_node(NULL, NULL, token, 0, is_leaf);
+			cur_node = cur_node->r;
+		} else {
+			if (cur_node->l == NULL)
+				cur_node->l = init_node(NULL, NULL, token, 0, is_leaf);
+			cur_node = cur_node->l;
+		}
+	}
+}
+
 // Recursive call to get tree depth
 // use cnt = 0 at top level
 unsigned int _tree_depth(Node* N, unsigned int cnt) {
@@ -320,27 +341,6 @@ void encode(FILE* infile, FILE* outfile, CharCode** write_table) {
 	}
 	fwrite(&tail_padding_zeros, sizeof(uint8_t), 1, outfile);
 	free(write_chunk);
-}
-
-/* given the main node N, the token (i.e. symbol), and
- * the code which defines the new node's position in
- * the tree.
- */
-void reconstruct_tree(Node* N, uint8_t token, uint8_t code_len, uint64_t code) {
-	Node* cur_node = N;
-	for (uint8_t i = 64; i > 64 - code_len; i--) {
-		bool is_leaf = i == (64 - code_len + 1);
-		uint64_t shift = (uint64_t) 1 << (i - 1);
-		if ((code & shift) == shift) {
-			if (cur_node->r == NULL)
-				cur_node->r = init_node(NULL, NULL, token, 0, is_leaf);
-			cur_node = cur_node->r;
-		} else {
-			if (cur_node->l == NULL)
-				cur_node->l = init_node(NULL, NULL, token, 0, is_leaf);
-			cur_node = cur_node->l;
-		}
-	}
 }
 
 // FILE FORMAT
