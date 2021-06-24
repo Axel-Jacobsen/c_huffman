@@ -11,8 +11,13 @@
 
 #define TOKEN_LEN 8 // right now only a token len of 8 bits
 #define TOKEN_SET_LEN (1 << TOKEN_LEN)
-#define WRITE_CHUNK_SIZE 80000
+#define WRITE_CHUNK_SIZE 8000
 #define NUM_BYTES(bits) ((bits - 1) / 8 + 1)
+
+/* errors:
+ * - when WRITE_CHUNK_SIZE > size of file, random letters scrambled
+ * - when WRITE_CHUNK_SIZE < size of file, completely fubar
+ */
 
 /* improvements:
  * - multithread in calc_char_freqs
