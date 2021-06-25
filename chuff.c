@@ -139,8 +139,6 @@ Node** get_min_two(Node** node_arr, uint64_t max_idx) {
  */
 Node* build_tree(uint64_t* freq_arr) {
 	uint16_t max_idx = get_num_chars(freq_arr);
-	printf("BUILD TREE\n");
-	printf("	max_idx = %d\n", max_idx);
 	num_chars = max_idx;
 
 	Node* fin_node;
@@ -148,14 +146,11 @@ Node* build_tree(uint64_t* freq_arr) {
 
 	// when n == 1, return node in array
 	while (max_idx > 1) {
-		printf("	max_idx = %d\n", max_idx);
 		// Find two lowest value nodes in node arr, w/ len number giving max len, and their indicies
-		printf("min two\n");
 		Node** min_two = get_min_two(node_arr, max_idx);
 		// Create node w/ the two lowest as children
 		uint64_t count = min_two[0]->count + min_two[1]->count;
 
-		printf("init node\n");
 		Node* N = init_node(min_two[0], min_two[1], 0, count, 0);
 		free(min_two);
 
@@ -176,14 +171,15 @@ void reconstruct_tree(Node* N, uint8_t token, uint8_t code_len, uint64_t code) {
 	Node* cur_node = N;
 	for (uint8_t i = 64; i > 64 - code_len; i--) {
 		bool is_leaf = i == (64 - code_len + 1);
+		uint8_t leaf_token = is_leaf ? token : 0;
 		uint64_t shift = (uint64_t) 1 << (i - 1);
 		if ((code & shift) == shift) {
 			if (cur_node->r == NULL)
-				cur_node->r = init_node(NULL, NULL, token, 0, is_leaf);
+				cur_node->r = init_node(NULL, NULL, leaf_token, 0, is_leaf);
 			cur_node = cur_node->r;
 		} else {
 			if (cur_node->l == NULL)
-				cur_node->l = init_node(NULL, NULL, token, 0, is_leaf);
+				cur_node->l = init_node(NULL, NULL, leaf_token, 0, is_leaf);
 			cur_node = cur_node->l;
 		}
 	}
@@ -239,6 +235,21 @@ void free_charcodes(CharCode** C) {
 	for (int i = 0; i < TOKEN_SET_LEN; i++) {
 		if (C[i]) free(C[i]);
 	}
+}
+
+bool trees_equal(Node* N1, Node* N2) {
+	printle_byte(N1->token); printf(" "); printle_byte(N2->token); printf("\n"); printf(" is leafs: N1 %d N2 %d\n", N1->is_leaf, N2->is_leaf);
+	if ((N1 == NULL) && (N2 == NULL)) {
+		printf("	both null\n");
+		return 1;
+	} else if ((N1 == NULL) != (N2 == NULL)) {
+		printf("	one null other not\n");
+		return 0;
+	} else if (N1->is_leaf && N2->is_leaf) {
+		printf("  both leafs: result %d\n",  N1->token == N2->token);
+		return N1->token == N2->token;
+	}
+	return trees_equal(N1->l, N2->l) && trees_equal(N1->r, N2->r);
 }
 
 // i love recursion
@@ -313,9 +324,6 @@ void encode(FILE* infile, FILE* outfile, CharCode** write_table) {
 		int_idx += code_len;
 
 		if (int_idx >= 63) {
-			// overflow on charcode, increment chunk_idx and prepare
-			// chunk_idx/code/code_len/int_idx for next write
-			printf("  int_idx overflow...\n");
 			code = code << (code_len - int_idx - 64);
 			code_len = int_idx - 64;
 			chunk_idx++;
@@ -340,7 +348,7 @@ void encode(FILE* infile, FILE* outfile, CharCode** write_table) {
 				printf("  finished write\n");
 				break;
 			}
-			printf("  loading char... ");
+			/* printf("  loading char... "); */
 			// load a char here
 			fread(&c, 1, 1, infile);
 			infile_pos++;
@@ -354,11 +362,10 @@ void encode(FILE* infile, FILE* outfile, CharCode** write_table) {
 			/* printf("write_table[%d] == NULL: %d\n", c, write_table[c] == NULL); */
 			code = write_table[c]->code;
 			code_len = write_table[c]->code_len;
-			printf("  done loading char\n");
+			/* printf("  done loading char\n"); */
 		}
 		// write and reset write_chunk, set chunk_idx to 0
 		if (chunk_idx == WRITE_CHUNK_SIZE) { // this chunk is full
-			printf("  flipping over write chunk size\n");
 			// set bytes to big endian order
 			for (int i = 0; i < chunk_idx+1; i++) {
 				/* write_chunk[i] = htonll(write_chunk[i]); */
@@ -382,7 +389,7 @@ void encode(FILE* infile, FILE* outfile, CharCode** write_table) {
 //	CONTENTS - encoded symbols in file
 //	TAIL
 //		<1 byte: number of bits padding end of file>
-void decode(FILE* encoded_fh, FILE* decoded_fh) {
+void decode(FILE* encoded_fh, FILE* decoded_fh, Node* tree) {
 	// hop to end of file to get file len, padding zeros
 	// offset of -1 so we can read the tail padding too.
 	// once we are done, return it to start of file.
@@ -415,7 +422,7 @@ void decode(FILE* encoded_fh, FILE* decoded_fh) {
 
 		reconstruct_tree(root, token, code_len, code);
 	}
-
+	printf("trees equal? %d\n", trees_equal(root, tree));
 	// read actual file data
 	uint64_t cur_file_pos = ftell(encoded_fh);
 	uint8_t byte;
@@ -465,14 +472,12 @@ int main(int argc, char *argv[]) {
 
 	printf("calculating char freqs...\n");
 	uint64_t* freq_arr = calculate_char_freqs(infile);
-	printf("freq_arr[0xff] = %llu\n", freq_arr[0xff]);
 
 	printf("build tree...\n");
 	Node* tree = build_tree(freq_arr);
-	printf("%llu\n", tree->count);
-	printf("print tree\n");
-	print2DUtil(tree, 1);
-	printf("print tree\n");
+
+
+	/* print2DUtil(tree, 1); */
 	printf("traverse tree...\n");
 	CharCode** C = traverse_tree(tree);
 
@@ -482,7 +487,7 @@ int main(int argc, char *argv[]) {
 		fprintf(stderr, "failed to open decoded\n");
 		exit(1);
 	}
-	
+
 	printf("encode...\n");
 	encode(infile, outfile, C);
 
@@ -500,7 +505,7 @@ int main(int argc, char *argv[]) {
 	outfile = fopen(outfile_name, "r");
 
 	printf("decode...\n");
-	decode(outfile, decoded);
+	decode(outfile, decoded, tree);
 
 	fclose(infile);
 }
