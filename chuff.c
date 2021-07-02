@@ -9,7 +9,7 @@
 
 #define TOKEN_LEN 8 // right now only a token len of 8 bits
 #define TOKEN_SET_LEN ((uint8_t)1 << TOKEN_LEN)
-#define WRITE_CHUNK_SIZE 8000
+#define WRITE_CHUNK_SIZE 8096
 #define NUM_BYTES(bits) ((bits - 1) / 8 + 1)
 
 /* improvements:
@@ -330,15 +330,15 @@ void encode(FILE* infile, FILE* outfile, CharCode** write_table) {
 			if (infile_pos == flen) {
 				// if we are out of chars and here, we write and are finished!
 				// set bytes to big endian order
-				for (int i = 0; i < chunk_idx+1; i++) {
+				for (int i = 0; i < chunk_idx+1; i++)
 					write_chunk[i] = htonll(write_chunk[i]);
-				}
+
 				// doing simple math to reduce number of redundant bits to less than 8
 				uint8_t final_u64_num_junk_bits = 64 - int_idx;
 				uint8_t full_junk_bytes = NUM_BYTES(final_u64_num_junk_bits) - 1; // we can right shift the final byte by this many bytes
 				uint8_t num_bytes_to_write = 8 - full_junk_bytes;
 				tail_padding_zeros = final_u64_num_junk_bits - 8 * full_junk_bytes;
-				uint64_t tail_chunk = write_chunk[chunk_idx]; //>> (8 * full_junk_bytes);
+				uint64_t tail_chunk = write_chunk[chunk_idx];;
 
 				fwrite(write_chunk, sizeof(uint64_t), chunk_idx, outfile);
 				fwrite(&tail_chunk, 1, num_bytes_to_write, outfile);
@@ -353,10 +353,14 @@ void encode(FILE* infile, FILE* outfile, CharCode** write_table) {
 		// write and reset write_chunk, set chunk_idx to 0
 		if (chunk_idx == WRITE_CHUNK_SIZE) { // this chunk is full
 			// set bytes to big endian order
-			for (int i = 0; i < chunk_idx+1; i++) {
-				/* write_chunk[i] = htonll(write_chunk[i]); */
-			}
+			for (int i = 0; i < WRITE_CHUNK_SIZE; i++)
+				write_chunk[i] = htonll(write_chunk[i]);
+
 			fwrite(write_chunk, sizeof(uint64_t), WRITE_CHUNK_SIZE, outfile);
+
+			for (int i = 0; i < WRITE_CHUNK_SIZE; i++)
+				write_chunk[i] = 0;
+
 			chunk_idx = 0;
 		}
 	}
@@ -364,17 +368,6 @@ void encode(FILE* infile, FILE* outfile, CharCode** write_table) {
 	free(write_chunk);
 }
 
-// FILE FORMAT
-//	HEADER - tells decoder how to read file
-//		consists of
-//		<1 byte: N = number of unique symbols in compressed file>
-//		<N symbols: <SYMBOL>> where
-//				SYMBOL = <symbol (1 byte) : \
-//						  # of bits of code in tree (1 byte) : \
-//						  code (# of bits, plus padding to make it bytes)>
-//	CONTENTS - encoded symbols in file
-//	TAIL
-//		<1 byte: number of bits padding end of file>
 void decode(FILE* encoded_fh, FILE* decoded_fh, Node* tree) {
 	// hop to end of file to get file len, padding zeros
 	// offset of -1 so we can read the tail padding too.
@@ -410,8 +403,8 @@ void decode(FILE* encoded_fh, FILE* decoded_fh, Node* tree) {
 	}
 
 	// tree reconstruction is correct
-	/* bool treeq = trees_equal(root, tree) */
-	/* if (!treeq) exit(1); */
+	bool treeq = trees_equal(root, tree);
+	if (!treeq) { printf("trees not equal on decode\n"); exit(1); }
 
 	// read actual file data
 	uint64_t cur_file_pos = ftell(encoded_fh);
