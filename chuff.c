@@ -432,14 +432,16 @@ void decode(FILE* encoded_fh, FILE* decoded_fh) {
 }
 
 int main(int argc, char *argv[]) {
-	bool decode_file = 0;
+	bool encode_file = 1;
+	char** outfile_name = NULL;
 
 	int opt;
-	while ((opt = getopt(argc, argv, "d")) != -1) {
+	while ((opt = getopt(argc, argv, "df")) != -1) {
 		switch (opt) {
-			case 'd': decode_file = 1; break;
+			case 'd': encode_file = 0; break;
+			case 'f': outfile_name = &optarg; break;
 			default:
-								fprintf(stderr, "Usage: %s [-d] [file...]\n", argv[0]);
+								fprintf(stderr, "Usage: %s [-d] [file...]\n\td -> decode\n\t", argv[0]);
 								exit(1);
 		}
 	}
@@ -457,12 +459,12 @@ int main(int argc, char *argv[]) {
 		exit(1);
 	}
 
-	if (!decode_file) {
+	if (encode_file) {
 		FILE *outfile;
-		char* outfile_name = strcat(fin, ".pine");
-		outfile = fopen(outfile_name, "w");
+		char* encoded_file = strcat(fin, ".pine");
+		outfile = fopen(encoded_file, "w");
 		if (!outfile) {
-			fprintf(stderr, "failed to open %s\n", outfile_name);
+			fprintf(stderr, "failed to open %s\n", encoded_file);
 			exit(1);
 		}
 
@@ -478,11 +480,13 @@ int main(int argc, char *argv[]) {
 
 		fclose(outfile);
 	} else {
-		char** outfile_name = &fin;
-		if (strstr(*outfile_name, ".pine") != NULL)
-			(*outfile_name)[strlen(*outfile_name) - 5] = '\0';
-		else
-			*outfile_name = strcat("decoded_", fin);
+		if (outfile_name == NULL) {
+			outfile_name = &fin;
+			if (strstr(*outfile_name, ".pine") != NULL)
+				(*outfile_name)[strlen(*outfile_name) - 5] = '\0';
+			else
+				*outfile_name = strcat("decoded_", fin);
+		}
 
 		FILE* outfile;
 		outfile = fopen(*outfile_name, "w");

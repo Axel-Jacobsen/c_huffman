@@ -9,12 +9,14 @@ if [[ -d $1 ]]; then
 	for f in "$1"/*; do
 		if [[ $f != *.pine ]]; then
 			./huff $f >/dev/null;
-			cmp --silent out/out.txt $f && (echo "$GRN$f$NC";) || (echo "$RED$f$NC";)
+			./huff -d "$f.pine" -f "out.txt" >/dev/null;
+			cmp --silent out.txt $f && (echo "$GRN$f$NC";) || (echo "$RED$f$NC";)
 			all_eq=$all_eq && [[ ! $? ]];
 		fi
 	done
 elif [[ -f $1 ]]; then
 	./huff $1 >/dev/null;
+	./huff -d "$1.pine" -f "out.txt" >/dev/null;
 	cmp --silent out/out.txt $f && (echo "$GRN$f$NC";) || (echo "$RED$f$NC";)
 	all_eq=$all_eq && [[ ! $? ]];
 else
