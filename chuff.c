@@ -10,7 +10,7 @@
 #include <errno.h>
 #include <math.h>
 
-#define TOKEN_LEN 8 // right now only a token len of 8 bits
+#define TOKEN_LEN 8
 #define TOKEN_SET_LEN ((uint8_t)1 << TOKEN_LEN)
 #define WRITE_CHUNK_SIZE 8096
 #define NUM_BYTES(bits) ((bits - 1) / 8 + 1)
@@ -18,7 +18,6 @@
 /* improvements:
  * - multithread in calc_char_freqs
  * - multithread in file writing?
- * - safe calloc/malloc
  */
 
 typedef _Bool bool;
@@ -145,8 +144,7 @@ Node** get_min_two(Node** node_arr, uint64_t max_idx) {
 	return lowest_pair;
 }
 
-/* There is probably a more efficient way to construct this tree.
- * Come back to optimize this.
+/* There is probably a more efficient way to construct this tree
  */
 Node* build_tree(uint64_t* freq_arr) {
 	uint16_t max_idx = get_num_chars(freq_arr);
