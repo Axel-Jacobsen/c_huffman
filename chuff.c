@@ -436,22 +436,24 @@ int main(int argc, char *argv[]) {
 	char** outfile_name = NULL;
 
 	int opt;
-	while ((opt = getopt(argc, argv, "df")) != -1) {
+	while ((opt = getopt(argc, argv, "df:")) != -1) {
 		switch (opt) {
 			case 'd': encode_file = 0; break;
 			case 'f': outfile_name = &optarg; break;
+			case '?': if (optopt == 'f')
+									fprintf (stderr, "Option -f requires an argument.\n");
 			default:
-								fprintf(stderr, "Usage: %s [-d] [file...]\n\td -> decode\n\t", argv[0]);
+								fprintf(stderr, "Usage: %s [-df] [file...]\n", argv[0]);
 								exit(1);
 		}
 	}
 
 	if (argv[optind] == NULL) {
-		fprintf(stderr, "Usage: %s [-d] [file]\n", argv[0]);
+		fprintf(stderr, "Usage: %s [-df] [file]\n", argv[0]);
 		exit(1);
 	}
-	char* fin = argv[optind];
 
+	char* fin = argv[optind];
 	FILE *infile;
 	infile = fopen(fin, "r");
 	if (!infile) {
@@ -487,7 +489,7 @@ int main(int argc, char *argv[]) {
 			else
 				*outfile_name = strcat("decoded_", fin);
 		}
-
+		
 		FILE* outfile;
 		outfile = fopen(*outfile_name, "w");
 		if (!outfile) {
