@@ -406,10 +406,10 @@ void decode(FILE* encoded_fh, FILE* decoded_fh) {
 	}
 
 	// read actual file data
-	uint64_t cur_file_pos = ftell(encoded_fh);
 	uint8_t byte;
 	uint8_t byte_valid_bits;
 	Node* N = root;
+	uint64_t cur_file_pos = ftell(encoded_fh);
 	for (; cur_file_pos < end_pos - 1; cur_file_pos++) {
 		// read byte
 		fread(&byte, 1, 1, encoded_fh);
@@ -431,46 +431,24 @@ void decode(FILE* encoded_fh, FILE* decoded_fh) {
 	free_tree(root);
 }
 
-char *strremove(char *str, const char *sub) {
-		// https://stackoverflow.com/questions/47116974/remove-a-substring-from-a-string-in-c
-    char *p, *q, *r;
-    if ((q = r = strstr(str, sub)) != NULL) {
-        size_t len = strlen(sub);
-        while ((r = strstr(p = r + len, sub)) != NULL) {
-            while (p < r)
-                *q++ = *p++;
-        }
-        while ((*q++ = *p++) != '\0')
-            continue;
-    }
-    return str;
-}
-
 int main(int argc, char *argv[]) {
-	if (argc == 1) {
-		fprintf(stderr, "Usage: %s [-d] [file...]\n", argv[0]);
-		exit(1);
-	}
-
 	bool decode_file = 0;
-	char* fin;
 
 	int opt;
 	while ((opt = getopt(argc, argv, "d")) != -1) {
 		switch (opt) {
 			case 'd': decode_file = 1; break;
 			default:
-				fprintf(stderr, "Usage: %s [-d] [file...]\n", argv[0]);
-				exit(1);
+								fprintf(stderr, "Usage: %s [-d] [file...]\n", argv[0]);
+								exit(1);
 		}
 	}
-
 
 	if (argv[optind] == NULL) {
 		fprintf(stderr, "Usage: %s [-d] [file]\n", argv[0]);
 		exit(1);
 	}
-	fin = argv[optind];
+	char* fin = argv[optind];
 
 	FILE *infile;
 	infile = fopen(fin, "r");
@@ -494,20 +472,22 @@ int main(int argc, char *argv[]) {
 
 		encode(infile, outfile, C);
 
-		free_tree(tree);
 		free_charcodes(C);
+		free_tree(tree);
 		free(freq_arr);
+
 		fclose(outfile);
 	} else {
-		printf("KSDJHFKLSJDHF");
-    char* outfile_name = strremove(fin, ".pine");
-		if (outfile_name == fin)
-			outfile_name = strcat("decoded_", fin);
+		char** outfile_name = &fin;
+		if (strstr(*outfile_name, ".pine") != NULL)
+			(*outfile_name)[strlen(*outfile_name) - 5] = '\0';
+		else
+			*outfile_name = strcat("decoded_", fin);
 
 		FILE* outfile;
-		outfile = fopen(outfile_name, "w");
+		outfile = fopen(*outfile_name, "w");
 		if (!outfile) {
-			fprintf(stderr, "failed to open %s\n", fin);
+			fprintf(stderr, "failed to open %s\n", *outfile_name);
 			exit(1);
 		}
 
