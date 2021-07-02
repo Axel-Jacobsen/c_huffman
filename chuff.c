@@ -434,26 +434,31 @@ void decode(FILE* encoded_fh, FILE* decoded_fh) {
 int main(int argc, char *argv[]) {
 	bool encode_file = 1;
 	char** outfile_name = NULL;
+	char* fin = NULL;
 
 	int opt;
-	while ((opt = getopt(argc, argv, "df:")) != -1) {
-		switch (opt) {
-			case 'd': encode_file = 0; break;
-			case 'f': outfile_name = &optarg; break;
-			case '?': if (optopt == 'f')
-									fprintf (stderr, "Option -f requires an argument.\n");
-			default:
-								fprintf(stderr, "Usage: %s [-df] [file...]\n", argv[0]);
-								exit(1);
+	while (optind < argc) {
+		if ((opt = getopt(argc, argv, "df:")) != -1) {
+			switch (opt) {
+				case 'd': encode_file = 0; break;
+				case 'f': outfile_name = &optarg; break;
+				case '?': if (optopt == 'f')
+										fprintf (stderr, "Option -f requires an argument.\n");
+				default:
+									fprintf(stderr, "Usage: %s [-df] [file...]\n", argv[0]);
+									exit(1);
+			}
+		} else {
+			fin = argv[optind];
+			optind++;
 		}
 	}
 
-	if (argv[optind] == NULL) {
-		fprintf(stderr, "Usage: %s [-df] [file]\n", argv[0]);
+	if (fin == NULL) {
+		fprintf(stderr, "Usage: %s [-df] [file...]\n", argv[0]);
 		exit(1);
 	}
 
-	char* fin = argv[optind];
 	FILE *infile;
 	infile = fopen(fin, "r");
 	if (!infile) {
@@ -489,7 +494,7 @@ int main(int argc, char *argv[]) {
 			else
 				*outfile_name = strcat("decoded_", fin);
 		}
-		
+
 		FILE* outfile;
 		outfile = fopen(*outfile_name, "w");
 		if (!outfile) {
