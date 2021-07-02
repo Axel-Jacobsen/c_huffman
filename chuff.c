@@ -1,7 +1,10 @@
 #include <stdlib.h>
 #include <stdio.h>
-#include <stdint.h>
+
 #include <arpa/inet.h>
+#include <unistd.h>
+#include <stdint.h>
+#include <string.h>
 #include <limits.h>
 #include <string.h>
 #include <errno.h>
@@ -368,7 +371,7 @@ void encode(FILE* infile, FILE* outfile, CharCode** write_table) {
 	free(write_chunk);
 }
 
-void decode(FILE* encoded_fh, FILE* decoded_fh, Node* tree) {
+void decode(FILE* encoded_fh, FILE* decoded_fh) {
 	// hop to end of file to get file len, padding zeros
 	// offset of -1 so we can read the tail padding too.
 	// once we are done, return it to start of file.
@@ -402,10 +405,6 @@ void decode(FILE* encoded_fh, FILE* decoded_fh, Node* tree) {
 		reconstruct_tree(root, token, code_len, code);
 	}
 
-	// tree reconstruction is correct
-	bool treeq = trees_equal(root, tree);
-	if (!treeq) { printf("trees not equal on decode\n"); exit(1); }
-
 	// read actual file data
 	uint64_t cur_file_pos = ftell(encoded_fh);
 	uint8_t byte;
@@ -432,61 +431,88 @@ void decode(FILE* encoded_fh, FILE* decoded_fh, Node* tree) {
 	free_tree(root);
 }
 
+char *strremove(char *str, const char *sub) {
+		// https://stackoverflow.com/questions/47116974/remove-a-substring-from-a-string-in-c
+    char *p, *q, *r;
+    if ((q = r = strstr(str, sub)) != NULL) {
+        size_t len = strlen(sub);
+        while ((r = strstr(p = r + len, sub)) != NULL) {
+            while (p < r)
+                *q++ = *p++;
+        }
+        while ((*q++ = *p++) != '\0')
+            continue;
+    }
+    return str;
+}
+
 int main(int argc, char *argv[]) {
-	if (argc != 2) {
-		fprintf(stderr, "usage: ./huff <file>\n");
+	if (argc == 1) {
+		fprintf(stderr, "Usage: %s [-d] [file...]\n", argv[0]);
 		exit(1);
 	}
+
+	bool decode_file = 0;
+	char* fin;
+
+	int opt;
+	while ((opt = getopt(argc, argv, "d")) != -1) {
+		switch (opt) {
+			case 'd': decode_file = 1; break;
+			default:
+				fprintf(stderr, "Usage: %s [-d] [file...]\n", argv[0]);
+				exit(1);
+		}
+	}
+
+
+	if (argv[optind] == NULL) {
+		fprintf(stderr, "Usage: %s [-d] [file]\n", argv[0]);
+		exit(1);
+	}
+	fin = argv[optind];
 
 	FILE *infile;
-	infile = fopen(argv[1], "r");
+	infile = fopen(fin, "r");
 	if (!infile) {
-		fprintf(stderr, "failed to open %s\n", argv[1]);
+		fprintf(stderr, "failed to open %s\n", fin);
 		exit(1);
 	}
 
-	FILE *outfile;
-	char* outfile_name = strcat(argv[1], ".pine");
-	outfile = fopen(outfile_name, "w");
-	if (!outfile) {
-		fprintf(stderr, "failed to open %s\n", outfile_name);
-		exit(1);
+	if (!decode_file) {
+		FILE *outfile;
+		char* outfile_name = strcat(fin, ".pine");
+		outfile = fopen(outfile_name, "w");
+		if (!outfile) {
+			fprintf(stderr, "failed to open %s\n", outfile_name);
+			exit(1);
+		}
+
+		uint64_t* freq_arr = calculate_char_freqs(infile);
+		Node* tree = build_tree(freq_arr);
+		CharCode** C = traverse_tree(tree);
+
+		encode(infile, outfile, C);
+
+		free_tree(tree);
+		free_charcodes(C);
+		free(freq_arr);
+		fclose(outfile);
+	} else {
+		printf("KSDJHFKLSJDHF");
+    char* outfile_name = strremove(fin, ".pine");
+		if (outfile_name == fin)
+			outfile_name = strcat("decoded_", fin);
+
+		FILE* outfile;
+		outfile = fopen(outfile_name, "w");
+		if (!outfile) {
+			fprintf(stderr, "failed to open %s\n", fin);
+			exit(1);
+		}
+
+		decode(infile, outfile);
+		fclose(outfile);
 	}
-
-	printf("calculating char freqs...\n");
-	uint64_t* freq_arr = calculate_char_freqs(infile);
-
-	printf("build tree...\n");
-	Node* tree = build_tree(freq_arr);
-
-
-	printf("traverse tree...\n");
-	CharCode** C = traverse_tree(tree);
-
-	FILE* decoded;
-	decoded = fopen("./out/out.txt", "w");
-	if (!decoded) {
-		fprintf(stderr, "failed to open decoded\n");
-		exit(1);
-	}
-
-	printf("encode...\n");
-	encode(infile, outfile, C);
-
-	printf("free charcodes...\n");
-	free_charcodes(C);
-
-	printf("free freq arr...\n");
-	free(freq_arr);
-
-	// Write file with Huffman Tree Symbols
-	fclose(outfile);
-	outfile = fopen(outfile_name, "r");
-
-	printf("decode...\n");
-	decode(outfile, decoded, tree);
-
-	printf("free tree...\n");
-	free_tree(tree);
 	fclose(infile);
 }
