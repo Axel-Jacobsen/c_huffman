@@ -7,23 +7,33 @@
 #include <errno.h>
 #include <math.h>
 
-#include "chuff.h"
-
 #define TOKEN_LEN 8 // right now only a token len of 8 bits
 #define TOKEN_SET_LEN ((uint8_t)1 << TOKEN_LEN)
 #define WRITE_CHUNK_SIZE 8000
 #define NUM_BYTES(bits) ((bits - 1) / 8 + 1)
-
-/* errors:
- * - when WRITE_CHUNK_SIZE > size of file, random letters scrambled
- * - when WRITE_CHUNK_SIZE < size of file, completely fubar
- */
 
 /* improvements:
  * - multithread in calc_char_freqs
  * - multithread in file writing?
  * - safe calloc/malloc
  */
+
+typedef _Bool bool;
+
+typedef struct Node {
+	struct Node * l, * r;
+	uint64_t count;
+	uint8_t token;
+	bool is_leaf;
+} Node;
+
+typedef struct CharCode {
+	uint64_t code;
+	uint8_t code_len;
+	uint8_t token;
+} CharCode;
+
+
 uint16_t num_chars = 0;
 
 uint64_t* calculate_char_freqs(FILE* f) {
@@ -48,11 +58,9 @@ uint64_t* calculate_char_freqs(FILE* f) {
 
 uint16_t get_num_chars(uint64_t* freq_arr) {
 	uint16_t num_chars = 0;
-	for (int i = 0; i < TOKEN_SET_LEN; i++) {
-		printf("i = %d freq_arr[i] = %llu\n", i, freq_arr[i]);
+	for (int i = 0; i < TOKEN_SET_LEN; i++)
 		if (freq_arr[i] != 0)
 			++num_chars;
-	}
 	return num_chars;
 }
 
@@ -200,7 +208,6 @@ unsigned int tree_depth(Node* N) {
 
 void _traverse(Node* N, CharCode* cur_cmprs, CharCode** write_table) {
 	if (N->is_leaf) {
-		/* printf("TRAVERSE TOKEN "); printle_byte(N->token); printf("\n"); */
 		cur_cmprs->token = N->token;
 		write_table[N->token] = cur_cmprs;
 		return;
@@ -224,9 +231,7 @@ CharCode** traverse_tree(Node* N) {
 		fprintf(stderr, "failed to allocate\n");
 		exit(1);
 	}
-	printf("	init charcode\n");
 	CharCode* first_charcode = init_charcode(0, 0, 0);
-	printf("	starting traverse...\n");
 	_traverse(N, first_charcode, md_arr);
 	return md_arr;
 }
@@ -238,17 +243,12 @@ void free_charcodes(CharCode** C) {
 }
 
 bool trees_equal(Node* N1, Node* N2) {
-	printle_byte(N1->token); printf(" "); printle_byte(N2->token); printf("\n"); printf(" is leafs: N1 %d N2 %d\n", N1->is_leaf, N2->is_leaf);
-	if ((N1 == NULL) && (N2 == NULL)) {
-		printf("	both null\n");
+	if ((N1 == NULL) && (N2 == NULL))
 		return 1;
-	} else if ((N1 == NULL) != (N2 == NULL)) {
-		printf("	one null other not\n");
+	else if ((N1 == NULL) != (N2 == NULL))
 		return 0;
-	} else if (N1->is_leaf && N2->is_leaf) {
-		printf("  both leafs: result %d\n",  N1->token == N2->token);
+	else if (N1->is_leaf && N2->is_leaf)
 		return N1->token == N2->token;
-	}
 	return trees_equal(N1->l, N2->l) && trees_equal(N1->r, N2->r);
 }
 
@@ -275,8 +275,8 @@ void encode(FILE* infile, FILE* outfile, CharCode** write_table) {
 	// FILE FORMAT
 	//	HEADER - tells decoder how to read file
 	//		consists of
-	//		<1 byte: N = number of unique symbols in compressed file>
-	//		<N bytes: <SYMBOL>> where
+	//		<2 bytes: N = number of unique symbols in compressed file>
+	//		<N symbols: <SYMBOL>> where
 	//				SYMBOL = <symbol (1 byte) : \
 	//						  # depth of symbol in tree (1 byte) : \
 	//						  code (# of bits, plus padding to make it bytes)>
@@ -305,7 +305,6 @@ void encode(FILE* infile, FILE* outfile, CharCode** write_table) {
 	// these from the CharCode object allows generalization in writing
 	// accross write_chunk elements. I.e., each time we add to a write_chunk,
 	// we add the most significant code_len bits of code.
-	printf("  writing charcodes...\n");
 	for (int i = 0; i < 256; i++)
 		if (write_table[i])
 			write_charcode(outfile, write_table[i]);
@@ -318,19 +317,17 @@ void encode(FILE* infile, FILE* outfile, CharCode** write_table) {
 	uint8_t tail_padding_zeros = 0;
 	uint64_t code = write_table[c]->code;
 	uint64_t code_len = write_table[c]->code_len;
-	printf("  writing file...\n");
 	for (;;) {
 		write_chunk[chunk_idx] |= code >> int_idx;
 		int_idx += code_len;
 
-		if (int_idx >= 63) {
+		if (int_idx >= 64) {
 			code = code << (code_len - int_idx - 64);
 			code_len = int_idx - 64;
 			chunk_idx++;
 			int_idx = 0;
 		} else {// load another char
 			if (infile_pos == flen) {
-				printf("  finishing write\n");
 				// if we are out of chars and here, we write and are finished!
 				// set bytes to big endian order
 				for (int i = 0; i < chunk_idx+1; i++) {
@@ -345,24 +342,13 @@ void encode(FILE* infile, FILE* outfile, CharCode** write_table) {
 
 				fwrite(write_chunk, sizeof(uint64_t), chunk_idx, outfile);
 				fwrite(&tail_chunk, 1, num_bytes_to_write, outfile);
-				printf("  finished write\n");
 				break;
 			}
-			/* printf("  loading char... "); */
 			// load a char here
 			fread(&c, 1, 1, infile);
 			infile_pos++;
-			/* printle_byte(c); */
-			/* printf("\n"); */
-			/* printf("i am seg faulting on c?!?!\n"); */
-			/* printf("write_table[%d] == NULL\n", c); */
-			/* CharCode* r = write_table[c]; */
-			/* printf("%d\n", r == NULL); */
-			/* printf("hm\n"); */
-			/* printf("write_table[%d] == NULL: %d\n", c, write_table[c] == NULL); */
 			code = write_table[c]->code;
 			code_len = write_table[c]->code_len;
-			/* printf("  done loading char\n"); */
 		}
 		// write and reset write_chunk, set chunk_idx to 0
 		if (chunk_idx == WRITE_CHUNK_SIZE) { // this chunk is full
@@ -382,7 +368,7 @@ void encode(FILE* infile, FILE* outfile, CharCode** write_table) {
 //	HEADER - tells decoder how to read file
 //		consists of
 //		<1 byte: N = number of unique symbols in compressed file>
-//		<N bytes: <SYMBOL>> where
+//		<N symbols: <SYMBOL>> where
 //				SYMBOL = <symbol (1 byte) : \
 //						  # of bits of code in tree (1 byte) : \
 //						  code (# of bits, plus padding to make it bytes)>
@@ -422,7 +408,11 @@ void decode(FILE* encoded_fh, FILE* decoded_fh, Node* tree) {
 
 		reconstruct_tree(root, token, code_len, code);
 	}
-	printf("trees equal? %d\n", trees_equal(root, tree));
+
+	// tree reconstruction is correct
+	/* bool treeq = trees_equal(root, tree) */
+	/* if (!treeq) exit(1); */
+
 	// read actual file data
 	uint64_t cur_file_pos = ftell(encoded_fh);
 	uint8_t byte;
@@ -477,7 +467,6 @@ int main(int argc, char *argv[]) {
 	Node* tree = build_tree(freq_arr);
 
 
-	/* print2DUtil(tree, 1); */
 	printf("traverse tree...\n");
 	CharCode** C = traverse_tree(tree);
 
@@ -490,9 +479,6 @@ int main(int argc, char *argv[]) {
 
 	printf("encode...\n");
 	encode(infile, outfile, C);
-
-	printf("free tree...\n");
-	free_tree(tree);
 
 	printf("free charcodes...\n");
 	free_charcodes(C);
@@ -507,5 +493,7 @@ int main(int argc, char *argv[]) {
 	printf("decode...\n");
 	decode(outfile, decoded, tree);
 
+	printf("free tree...\n");
+	free_tree(tree);
 	fclose(infile);
 }
