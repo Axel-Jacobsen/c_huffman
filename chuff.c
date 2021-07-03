@@ -1,10 +1,8 @@
 #include <stdlib.h>
 #include <stdio.h>
-
 #include <arpa/inet.h>
 #include <unistd.h>
 #include <stdint.h>
-#include <string.h>
 #include <limits.h>
 #include <string.h>
 #include <errno.h>
@@ -145,7 +143,7 @@ Node** get_min_two(Node** node_arr, uint64_t max_idx) {
 }
 
 /* There is probably a more efficient way to construct this tree
- */
+*/
 Node* build_tree(uint64_t* freq_arr) {
 	uint16_t max_idx = get_num_chars(freq_arr);
 	num_chars = max_idx;
@@ -299,7 +297,7 @@ void encode(FILE* infile, FILE* outfile, CharCode** write_table) {
 	int8_t int_idx = 0;
 
 	// start of file writing
-	// first, write the number of chars
+	// first, write the number of chars (from global scope)
 	fwrite(&num_chars, sizeof(uint16_t), 1, outfile);
 
 	// we only need the code and code_len, and seperating
@@ -327,7 +325,7 @@ void encode(FILE* infile, FILE* outfile, CharCode** write_table) {
 			code_len = int_idx - 64;
 			chunk_idx++;
 			int_idx = 0;
-		} else {// load another char
+		} else { // load another char
 			if (infile_pos == flen) {
 				// if we are out of chars and here, we write and are finished!
 				// set bytes to big endian order
@@ -336,7 +334,7 @@ void encode(FILE* infile, FILE* outfile, CharCode** write_table) {
 
 				// doing simple math to reduce number of redundant bits to less than 8
 				uint8_t final_u64_num_junk_bits = 64 - int_idx;
-				uint8_t full_junk_bytes = NUM_BYTES(final_u64_num_junk_bits) - 1; // we can right shift the final byte by this many bytes
+				uint8_t full_junk_bytes = NUM_BYTES(final_u64_num_junk_bits) - 1;
 				uint8_t num_bytes_to_write = 8 - full_junk_bytes;
 				tail_padding_zeros = final_u64_num_junk_bits - 8 * full_junk_bytes;
 				uint64_t tail_chunk = write_chunk[chunk_idx];;
