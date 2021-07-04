@@ -16,6 +16,7 @@
 /* improvements:
  * - multithread in calc_char_freqs
  * - multithread in file writing?
+ * - add appropriate keywords (const, static, etc)
  */
 
 typedef _Bool bool;
