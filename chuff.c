@@ -10,7 +10,7 @@
 
 #define TOKEN_LEN 8
 #define TOKEN_SET_LEN ((uint8_t)1 << TOKEN_LEN)
-#define WRITE_CHUNK_SIZE 8096
+#define WRITE_CHUNK_SIZE 8192
 #define NUM_BYTES(bits) ((bits - 1) / 8 + 1)
 
 /* improvements:
