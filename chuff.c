@@ -358,8 +358,7 @@ void encode(FILE* infile, FILE* outfile, CharCode** write_table) {
 
 			fwrite(write_chunk, sizeof(uint64_t), WRITE_CHUNK_SIZE, outfile);
 
-			for (int i = 0; i < WRITE_CHUNK_SIZE; i++)
-				write_chunk[i] = 0;
+			memset(write_chunk, 0, WRITE_CHUNK_SIZE*sizeof(*write_chunk));
 
 			chunk_idx = 0;
 		}
