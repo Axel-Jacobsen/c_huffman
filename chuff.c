@@ -464,8 +464,9 @@ int main(int argc, char *argv[]) {
 	}
 
 	if (encode_file) {
-		FILE *outfile;
 		char* encoded_file = strcat(fin, ".pine");
+
+		FILE *outfile;
 		outfile = fopen(encoded_file, "w");
 		if (!outfile) {
 			fprintf(stderr, "failed to open %s\n", encoded_file);
