@@ -37,12 +37,31 @@ typedef struct CharCode {
 
 uint16_t num_chars = 0;
 
-uint64_t* calculate_char_freqs(FILE* f) {
-	uint64_t* freq_arr = (uint64_t*) calloc((size_t) TOKEN_SET_LEN, sizeof(uint64_t));
-	if (!freq_arr) {
-		fprintf(stderr, "char frequency allocation failed\n");
+
+void* safemalloc(size_t size, char* err_msg) {
+	void* arr = malloc(size);
+	if (!arr) {
+		fprintf(stderr, "%s", err_msg);
 		exit(1);
 	}
+	return arr;
+}
+
+void* safecalloc(size_t count, size_t size, char* err_msg) {
+	void* arr = calloc(count, size);
+	if (!arr) {
+		fprintf(stderr, "%s", err_msg);
+		exit(1);
+	}
+	return arr;
+}
+
+uint64_t* calculate_char_freqs(FILE* f) {
+	uint64_t* freq_arr = (uint64_t*) safecalloc(
+			(size_t) TOKEN_SET_LEN,
+			sizeof(uint64_t),
+			"char frequency allocation failed\n"
+	);
 
 	fseek(f, 0L, SEEK_END);
 	uint64_t flen = ftell(f);
@@ -66,11 +85,8 @@ uint16_t get_num_chars(uint64_t* freq_arr) {
 }
 
 Node* init_node(Node* n1, Node* n2, uint8_t tkn, uint64_t cnt, bool is_leaf) {
-	Node* N = (Node*) malloc(sizeof(Node));
-	if (!N) {
-		fprintf(stderr, "failure initializing Node: %s\n", strerror(errno));
-		exit(1);
-	}
+	Node* N = (Node*) safemalloc(sizeof(Node), "failure initializing Node\n");
+
 	N->l = n1;
 	N->r = n2;
 	N->token = tkn;
@@ -80,11 +96,9 @@ Node* init_node(Node* n1, Node* n2, uint8_t tkn, uint64_t cnt, bool is_leaf) {
 }
 
 CharCode* init_charcode(uint64_t code, uint8_t code_len,	uint8_t token) {
-	CharCode* C = (CharCode*) malloc(sizeof(CharCode));
-	if (!C) {
-		fprintf(stderr, "failure initializing CharCode: %s\n", strerror(errno));
-		exit(1);
-	}
+	char* s = "failure initializing CharCode\n";
+	CharCode* C = (CharCode*) safemalloc(sizeof(CharCode), s);
+
 	C->code = code;
 	C->code_len = code_len;
 	C->token = token;
@@ -92,8 +106,10 @@ CharCode* init_charcode(uint64_t code, uint8_t code_len,	uint8_t token) {
 }
 
 Node** init_node_arr_from_chars(uint64_t* freq_arr, uint16_t num_chars) {
+	char* s = "failure initializing node array\n";
+	Node** node_arr = (Node**) safecalloc(num_chars, sizeof(Node*), s);
+
 	uint64_t j = 0;
-	Node** node_arr = (Node**) calloc(num_chars, sizeof(Node*));
 	for (uint64_t i = 0; i < TOKEN_SET_LEN; i++) {
 		if (freq_arr[i] != 0) {
 			node_arr[j] = init_node(NULL, NULL, i, freq_arr[i], 1);
@@ -122,11 +138,9 @@ Node** get_min_two(Node** node_arr, uint64_t max_idx) {
 	int64_t lidx = UINT_MAX;
 	int64_t slidx = UINT_MAX;
 
-	Node** lowest_pair = (Node**) calloc(2, sizeof(Node*));
-	if (!lowest_pair) {
-		fprintf(stderr, "failure initializing node array in get_min_two: %s\n", strerror(errno));
-		exit(1);
-	}
+	char* s = "failure initializing node array in get_min_two\n";
+	Node** lowest_pair = (Node**) safecalloc(2, sizeof(Node*), s);
+
 	for (uint64_t i = 0; i < max_idx; i++) {
 		if (node_arr[i]->count < lowest) 	{
 			lowest = node_arr[i]->count;
@@ -226,14 +240,11 @@ void _traverse(Node* N, CharCode* cur_cmprs, CharCode** write_table) {
 }
 
 CharCode** traverse_tree(Node* N) {
-	CharCode** md_arr = (CharCode**) calloc(TOKEN_SET_LEN, sizeof(CharCode*));
-	if (!md_arr) {
-		fprintf(stderr, "failed to allocate\n");
-		exit(1);
-	}
+	char* s = "failed to allocate CharCode array in traverse_tree\n";
+	CharCode** ccarr = (CharCode**) safecalloc(TOKEN_SET_LEN, sizeof(CharCode*), s);
 	CharCode* first_charcode = init_charcode(0, 0, 0);
-	_traverse(N, first_charcode, md_arr);
-	return md_arr;
+	_traverse(N, first_charcode, ccarr);
+	return ccarr;
 }
 
 void free_charcodes(CharCode** C) {
@@ -293,7 +304,8 @@ void encode(FILE* infile, FILE* outfile, CharCode** write_table) {
 	// chunk_idx is the index of the write_chunk array that is being written to.
 	// int_idx is the index of the uint64_t (given by write_chunk[chunk_idx]) that hasn't
 	//   been written to yet.
-	uint64_t* write_chunk = (uint64_t*)calloc(WRITE_CHUNK_SIZE, sizeof(uint64_t));
+	char* s = "failed initializing write_chunk in encode\n";
+	uint64_t* write_chunk = (uint64_t*)safecalloc(WRITE_CHUNK_SIZE, sizeof(uint64_t), s);
 	uint64_t chunk_idx = 0;
 	int8_t int_idx = 0;
 
