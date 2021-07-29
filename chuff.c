@@ -10,8 +10,8 @@
 
 #define TOKEN_LEN 8
 #define TOKEN_SET_LEN ((uint8_t)1 << TOKEN_LEN)
-#define READ_CHUNK_SIZE 8192
-#define WRITE_CHUNK_SIZE 8192
+#define READ_CHUNK_SIZE 100000
+#define WRITE_CHUNK_SIZE 100000
 #define NUM_BYTES(bits) ((bits - 1) / 8 + 1)
 
 /* improvements:
@@ -65,12 +65,12 @@ uint64_t* calculate_char_freqs(FILE* f) {
 	);
 
 	char* s = "failed initializing char arr in char freqs\n";
-	uint8_t* chunk = safecalloc(READ_CHUNK_SIZE, 1, s);
+	uint8_t* read_chunk = safecalloc(READ_CHUNK_SIZE, 1, s);
 
 	size_t bytes_read = 0;
-	while ((bytes_read = fread(chunk, 1, READ_CHUNK_SIZE, f)) > 0) {
+	while ((bytes_read = fread(read_chunk, 1, READ_CHUNK_SIZE, f)) > 0) {
 		for (size_t i = 0; i < bytes_read; i++) {
-			freq_arr[chunk[i]]++;
+			freq_arr[read_chunk[i]]++;
 		}
 	}
 
@@ -327,9 +327,16 @@ void encode(FILE* infile, FILE* outfile, CharCode** write_table) {
 	uint64_t infile_pos = 1;
 	fread(&c, 1, 1, infile);
 
+	s = "failed initializing char arr in char freqs\n";
+	uint8_t* read_chunk = safecalloc(READ_CHUNK_SIZE, 1, s);
+
+	size_t read_idx = 0;
+	size_t bytes_read = fread(read_chunk, 1, READ_CHUNK_SIZE, infile);
+
 	uint8_t tail_padding_zeros = 0;
 	uint64_t code = write_table[c]->code;
 	uint64_t code_len = write_table[c]->code_len;
+
 	for (;;) {
 		write_chunk[chunk_idx] |= code >> int_idx;
 		int_idx += code_len;
@@ -358,10 +365,15 @@ void encode(FILE* infile, FILE* outfile, CharCode** write_table) {
 				break;
 			}
 			// load a char here
-			fread(&c, 1, 1, infile);
-			infile_pos++;
+			if (read_idx == READ_CHUNK_SIZE) {
+				read_idx = 0;
+				bytes_read = fread(read_chunk, 1, READ_CHUNK_SIZE, infile);
+			}
+			c = read_chunk[read_idx];
 			code = write_table[c]->code;
 			code_len = write_table[c]->code_len;
+			read_idx++;
+			infile_pos++;
 		}
 		// write and reset write_chunk, set chunk_idx to 0
 		if (chunk_idx == WRITE_CHUNK_SIZE) { // this chunk is full
@@ -370,9 +382,7 @@ void encode(FILE* infile, FILE* outfile, CharCode** write_table) {
 				write_chunk[i] = htonll(write_chunk[i]);
 
 			fwrite(write_chunk, sizeof(uint64_t), WRITE_CHUNK_SIZE, outfile);
-
 			memset(write_chunk, 0, WRITE_CHUNK_SIZE*sizeof(*write_chunk));
-
 			chunk_idx = 0;
 		}
 	}
@@ -417,6 +427,10 @@ void decode(FILE* encoded_fh, FILE* decoded_fh) {
 	// read actual file data
 	uint8_t byte;
 	uint8_t byte_valid_bits;
+	/* char* s = "failed creating write chunk\n"; */
+	/* uint8_t* write_chunk = safecalloc(WRITE_CHUNK_SIZE, 1, s); */
+	/* size_t write_idx = 0; */
+
 	Node* N = root;
 	uint64_t cur_file_pos = ftell(encoded_fh);
 	for (; cur_file_pos < end_pos - 1; cur_file_pos++) {
@@ -433,6 +447,12 @@ void decode(FILE* encoded_fh, FILE* decoded_fh) {
 
 			if (N->is_leaf) {
 				fwrite(&N->token, 1, 1, decoded_fh);
+				/* write_chunk[write_idx] = N->token; */
+				/* write_idx++; */
+				/* if (write_idx == WRITE_CHUNK_SIZE || cur_file_pos == end_pos - 2) { */
+				/* 	fwrite(write_chunk, write_idx, 1, decoded_fh); */
+				/* 	write_idx = 0; */
+				/* } */
 				N = root;
 			}
 		}
