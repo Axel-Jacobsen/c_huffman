@@ -427,9 +427,9 @@ void decode(FILE* encoded_fh, FILE* decoded_fh) {
 	// read actual file data
 	uint8_t byte;
 	uint8_t byte_valid_bits;
-	/* char* s = "failed creating write chunk\n"; */
-	/* uint8_t* write_chunk = safecalloc(WRITE_CHUNK_SIZE, 1, s); */
-	/* size_t write_idx = 0; */
+	char* s = "failed creating write chunk\n";
+	uint8_t* write_chunk = safecalloc(WRITE_CHUNK_SIZE, 1, s);
+	size_t write_idx = 0;
 
 	Node* N = root;
 	uint64_t cur_file_pos = ftell(encoded_fh);
@@ -446,17 +446,18 @@ void decode(FILE* encoded_fh, FILE* decoded_fh) {
 				N = N->l;
 
 			if (N->is_leaf) {
-				fwrite(&N->token, 1, 1, decoded_fh);
-				/* write_chunk[write_idx] = N->token; */
-				/* write_idx++; */
-				/* if (write_idx == WRITE_CHUNK_SIZE || cur_file_pos == end_pos - 2) { */
-				/* 	fwrite(write_chunk, write_idx, 1, decoded_fh); */
-				/* 	write_idx = 0; */
-				/* } */
+				write_chunk[write_idx] = N->token;
+				write_idx++;
+				if (write_idx == WRITE_CHUNK_SIZE) {
+					fwrite(write_chunk, 1, write_idx, decoded_fh);
+					write_idx = 0;
+				}
 				N = root;
 			}
 		}
 	}
+	fwrite(write_chunk, 1, write_idx, decoded_fh);
+
 	free_tree(root);
 }
 
