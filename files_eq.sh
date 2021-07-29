@@ -17,7 +17,7 @@ if [[ -d $1 ]]; then
 elif [[ -f $1 ]]; then
 	./huff $1;
 	./huff -d -f out.txt $1.pine;
-	cmp out.txt $f && (echo "$GRN$f$NC";) || (echo "$RED$f$NC";)
+	cmp out.txt $1 && (echo "$GRN$1$NC";) || (echo "$RED$1$NC";)
 	all_eq=$all_eq && [[ ! $? ]];
 else
 	echo "$1 is not valid - must be file or directory"
