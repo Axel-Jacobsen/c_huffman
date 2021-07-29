@@ -10,6 +10,7 @@
 
 #define TOKEN_LEN 8
 #define TOKEN_SET_LEN ((uint8_t)1 << TOKEN_LEN)
+#define READ_CHUNK_SIZE 8192
 #define WRITE_CHUNK_SIZE 8192
 #define NUM_BYTES(bits) ((bits - 1) / 8 + 1)
 
@@ -39,12 +40,12 @@ uint16_t num_chars = 0;
 
 
 void* safemalloc(size_t size, char* err_msg) {
-	void* arr = malloc(size);
-	if (!arr) {
+	void* m = malloc(size);
+	if (!m) {
 		fprintf(stderr, "%s", err_msg);
 		exit(1);
 	}
-	return arr;
+	return m;
 }
 
 void* safecalloc(size_t count, size_t size, char* err_msg) {
@@ -63,16 +64,16 @@ uint64_t* calculate_char_freqs(FILE* f) {
 			"char frequency allocation failed\n"
 	);
 
-	fseek(f, 0L, SEEK_END);
-	uint64_t flen = ftell(f);
-	fseek(f, 0L, SEEK_SET);
+	char* s = "failed initializing char arr in char freqs\n";
+	uint8_t* chunk = safecalloc(READ_CHUNK_SIZE, 1, s);
 
-	uint8_t c = 0;
-	for (int i = 0; i < flen; i++) {
-		fread((void*)&c, 1, 1, f);
-		freq_arr[c]++;
+	size_t bytes_read = 0;
+	while ((bytes_read = fread(chunk, 1, READ_CHUNK_SIZE, f)) > 0) {
+		for (size_t i = 0; i < bytes_read; i++) {
+			freq_arr[chunk[i]]++;
+		}
 	}
-	fseek(f, 0L, SEEK_SET);
+
 	return freq_arr;
 }
 
