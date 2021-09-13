@@ -39,7 +39,7 @@ typedef struct CharCode {
 uint16_t num_chars = 0;
 
 
-void* safemalloc(size_t size, char* err_msg) {
+void* safemalloc(size_t size, const char* err_msg) {
 	void* m = malloc(size);
 	if (!m) {
 		fprintf(stderr, "%s", err_msg);
@@ -48,7 +48,7 @@ void* safemalloc(size_t size, char* err_msg) {
 	return m;
 }
 
-void* safecalloc(size_t count, size_t size, char* err_msg) {
+void* safecalloc(size_t count, size_t size, const char* err_msg) {
 	void* arr = calloc(count, size);
 	if (!arr) {
 		fprintf(stderr, "%s", err_msg);
