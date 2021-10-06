@@ -192,7 +192,7 @@ Node* build_tree(uint64_t* freq_arr) {
  */
 void reconstruct_tree(Node* N, uint8_t token, uint8_t code_len, uint64_t code) {
 	Node* cur_node = N;
-	for (uint8_t i = 64; i > 64 - code_len; i--) {
+	for (unsigned int i = 64; i > 64 - code_len; i--) {
 		bool is_leaf = i == (64 - code_len + 1);
 		uint8_t leaf_token = is_leaf ? token : 0;
 		uint64_t shift = (uint64_t) 1 << (i - 1);
