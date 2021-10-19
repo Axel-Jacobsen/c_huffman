@@ -472,8 +472,10 @@ int main(int argc, char *argv[]) {
 			switch (opt) {
 				case 'd': encode_file = 0; break;
 				case 'f': outfile_name = &optarg; break;
-				case '?': if (optopt == 'f')
+				case '?': if (optopt == 'f') {
 										fprintf (stderr, "Option -f requires an argument.\n");
+                    exit(1);
+                  }
 				default:
 									fprintf(stderr, "Usage: %s [-df] [file...]\n", argv[0]);
 									exit(1);
