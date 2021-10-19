@@ -136,14 +136,20 @@ void swap_idxs(Node** node_arr, uint64_t lidx, uint64_t slidx, uint64_t max_idx)
 Node** get_min_two(Node** node_arr, uint64_t max_idx) {
 	uint64_t lowest = UINT_MAX;
 	uint64_t second_lowest = UINT_MAX;
-	int64_t lidx = UINT_MAX;
-	int64_t slidx = UINT_MAX;
+	uint64_t lidx = UINT_MAX;
+	uint64_t slidx = UINT_MAX;
 
 	char* s = "failure initializing node array in get_min_two\n";
 	Node** lowest_pair = (Node**) safecalloc(2, sizeof(Node*), s);
 
 	for (uint64_t i = 0; i < max_idx; i++) {
 		if (node_arr[i]->count < lowest) 	{
+      if (lowest < second_lowest) {
+        second_lowest = lowest;
+        lowest_pair[1] = lowest_pair[0];
+        slidx = lidx;
+      }
+
 			lowest = node_arr[i]->count;
 			lowest_pair[0] = node_arr[i];
 			lidx = i;
@@ -154,7 +160,7 @@ Node** get_min_two(Node** node_arr, uint64_t max_idx) {
 			slidx = i;
 		}
 	}
-	swap_idxs(node_arr, slidx, lidx, max_idx);
+	swap_idxs(node_arr, lidx, slidx, max_idx);
 	return lowest_pair;
 }
 
