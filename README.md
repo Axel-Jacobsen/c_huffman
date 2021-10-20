@@ -1,6 +1,6 @@
 # Huffman Compression in C
 
-Simple huffman compression written in C to get used to the language.
+Simple huffman compression written in C to get used to the language, and cause compression is fun
 
 `make` to compile the code, then
 
