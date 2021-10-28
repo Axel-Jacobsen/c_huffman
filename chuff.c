@@ -356,7 +356,7 @@ void encode(FILE* infile, FILE* outfile, CharCode** write_table) {
 			if (infile_pos == flen) {
 				// if we are out of chars and here, we write and are finished!
 				// set bytes to big endian order
-				for (int i = 0; i < chunk_idx+1; i++)
+				for (unsigned int i = 0; i < chunk_idx+1; i++)
 					write_chunk[i] = htonll(write_chunk[i]);
 
 				// doing simple math to reduce number of redundant bits to less than 8
