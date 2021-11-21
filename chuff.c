@@ -1,12 +1,12 @@
-#include <stdlib.h>
-#include <stdio.h>
 #include <arpa/inet.h>
-#include <unistd.h>
-#include <stdint.h>
-#include <limits.h>
-#include <string.h>
 #include <errno.h>
+#include <limits.h>
 #include <math.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
 
 #define TOKEN_LEN 8
 #define TOKEN_SET_LEN ((uint8_t)1 << TOKEN_LEN)
@@ -23,7 +23,7 @@
 typedef _Bool bool;
 
 typedef struct Node {
-  struct Node * l, * r;
+  struct Node *l, *r;
   uint64_t count;
   uint8_t token;
   bool is_leaf;
@@ -35,12 +35,10 @@ typedef struct CharCode {
   uint8_t token;
 } CharCode;
 
-
 uint16_t num_chars = 0;
 
-
-void* safemalloc(size_t size, const char* err_msg) {
-  void* m = malloc(size);
+void *safemalloc(size_t size, const char *err_msg) {
+  void *m = malloc(size);
   if (!m) {
     fprintf(stderr, "%s", err_msg);
     exit(1);
@@ -48,8 +46,8 @@ void* safemalloc(size_t size, const char* err_msg) {
   return m;
 }
 
-void* safecalloc(size_t count, size_t size, const char* err_msg) {
-  void* arr = calloc(count, size);
+void *safecalloc(size_t count, size_t size, const char *err_msg) {
+  void *arr = calloc(count, size);
   if (!arr) {
     fprintf(stderr, "%s", err_msg);
     exit(1);
@@ -57,15 +55,13 @@ void* safecalloc(size_t count, size_t size, const char* err_msg) {
   return arr;
 }
 
-uint64_t* calculate_char_freqs(FILE* f) {
-  uint64_t* freq_arr = (uint64_t*) safecalloc(
-      (size_t) TOKEN_SET_LEN,
-      sizeof(uint64_t),
-      "char frequency allocation failed\n"
-  );
+uint64_t *calculate_char_freqs(FILE *f) {
+  uint64_t *freq_arr =
+      (uint64_t *)safecalloc((size_t)TOKEN_SET_LEN, sizeof(uint64_t),
+                             "char frequency allocation failed\n");
 
-  char* s = "failed initializing char arr in char freqs\n";
-  uint8_t* read_chunk = safecalloc(READ_CHUNK_SIZE, 1, s);
+  char *s = "failed initializing char arr in char freqs\n";
+  uint8_t *read_chunk = safecalloc(READ_CHUNK_SIZE, 1, s);
 
   size_t bytes_read = 0;
   while ((bytes_read = fread(read_chunk, 1, READ_CHUNK_SIZE, f)) > 0) {
@@ -77,7 +73,7 @@ uint64_t* calculate_char_freqs(FILE* f) {
   return freq_arr;
 }
 
-uint16_t get_num_chars(uint64_t* freq_arr) {
+uint16_t get_num_chars(uint64_t *freq_arr) {
   uint16_t num_chars = 0;
   for (int i = 0; i < TOKEN_SET_LEN; i++)
     if (freq_arr[i] != 0)
@@ -85,20 +81,20 @@ uint16_t get_num_chars(uint64_t* freq_arr) {
   return num_chars;
 }
 
-Node* init_node(Node* n1, Node* n2, uint8_t tkn, uint64_t cnt, bool is_leaf) {
-  Node* N = (Node*) safemalloc(sizeof(Node), "failure initializing Node\n");
+Node *init_node(Node *n1, Node *n2, uint8_t tkn, uint64_t cnt, bool is_leaf) {
+  Node *N = (Node *)safemalloc(sizeof(Node), "failure initializing Node\n");
 
   N->l = n1;
   N->r = n2;
   N->token = tkn;
   N->count = cnt;
   N->is_leaf = is_leaf;
-  return (Node*) N;
+  return (Node *)N;
 }
 
-CharCode* init_charcode(uint64_t code, uint8_t code_len,  uint8_t token) {
-  char* s = "failure initializing CharCode\n";
-  CharCode* C = (CharCode*) safemalloc(sizeof(CharCode), s);
+CharCode *init_charcode(uint64_t code, uint8_t code_len, uint8_t token) {
+  char *s = "failure initializing CharCode\n";
+  CharCode *C = (CharCode *)safemalloc(sizeof(CharCode), s);
 
   C->code = code;
   C->code_len = code_len;
@@ -106,9 +102,9 @@ CharCode* init_charcode(uint64_t code, uint8_t code_len,  uint8_t token) {
   return C;
 }
 
-Node** init_node_arr_from_chars(uint64_t* freq_arr, uint16_t num_chars) {
-  char* s = "failure initializing node array\n";
-  Node** node_arr = (Node**) safecalloc(num_chars, sizeof(Node*), s);
+Node **init_node_arr_from_chars(uint64_t *freq_arr, uint16_t num_chars) {
+  char *s = "failure initializing node array\n";
+  Node **node_arr = (Node **)safecalloc(num_chars, sizeof(Node *), s);
 
   uint64_t j = 0;
   for (uint64_t i = 0; i < TOKEN_SET_LEN; i++) {
@@ -120,30 +116,32 @@ Node** init_node_arr_from_chars(uint64_t* freq_arr, uint16_t num_chars) {
   return node_arr;
 }
 
-void swap_idxs(Node** node_arr, uint64_t lidx, uint64_t slidx, uint64_t max_idx) {
+void swap_idxs(Node **node_arr, uint64_t lidx, uint64_t slidx,
+               uint64_t max_idx) {
   // swap 1
-  Node* ldx_tmp = node_arr[slidx];
+  Node *ldx_tmp = node_arr[slidx];
   node_arr[lidx] = node_arr[max_idx - 1];
   node_arr[max_idx - 1] = ldx_tmp;
   // swap 2
-  if (slidx == max_idx - 1) // slidx has been swapped by code above, so now in lidx
+  if (slidx ==
+      max_idx - 1) // slidx has been swapped by code above, so now in lidx
     slidx = lidx;
-  Node* slidx_tmp = node_arr[slidx];
+  Node *slidx_tmp = node_arr[slidx];
   node_arr[slidx] = node_arr[max_idx - 2];
   node_arr[max_idx - 2] = slidx_tmp;
 }
 
-Node** get_min_two(Node** node_arr, uint64_t max_idx) {
+Node **get_min_two(Node **node_arr, uint64_t max_idx) {
   uint64_t lowest = UINT_MAX;
   uint64_t second_lowest = UINT_MAX;
   uint64_t lidx = UINT_MAX;
   uint64_t slidx = UINT_MAX;
 
-  char* s = "failure initializing node array in get_min_two\n";
-  Node** lowest_pair = (Node**) safecalloc(2, sizeof(Node*), s);
+  char *s = "failure initializing node array in get_min_two\n";
+  Node **lowest_pair = (Node **)safecalloc(2, sizeof(Node *), s);
 
   for (uint64_t i = 0; i < max_idx; i++) {
-    if (node_arr[i]->count < lowest)  {
+    if (node_arr[i]->count < lowest) {
       if (lowest < second_lowest) {
         second_lowest = lowest;
         lowest_pair[1] = lowest_pair[0];
@@ -153,8 +151,7 @@ Node** get_min_two(Node** node_arr, uint64_t max_idx) {
       lowest = node_arr[i]->count;
       lowest_pair[0] = node_arr[i];
       lidx = i;
-    }
-    else if (node_arr[i]->count < second_lowest)  {
+    } else if (node_arr[i]->count < second_lowest) {
       second_lowest = node_arr[i]->count;
       lowest_pair[1] = node_arr[i];
       slidx = i;
@@ -165,26 +162,28 @@ Node** get_min_two(Node** node_arr, uint64_t max_idx) {
 }
 
 /* There is probably a more efficient way to construct this tree
-*/
-Node* build_tree(uint64_t* freq_arr) {
+ */
+Node *build_tree(uint64_t *freq_arr) {
   uint16_t max_idx = get_num_chars(freq_arr);
   num_chars = max_idx;
 
-  Node* fin_node;
-  Node** node_arr = init_node_arr_from_chars(freq_arr, max_idx);
+  Node *fin_node;
+  Node **node_arr = init_node_arr_from_chars(freq_arr, max_idx);
 
   // when n == 1, return node in array
   while (max_idx > 1) {
-    // Find two lowest value nodes in node arr, w/ len number giving max len, and their indicies
-    Node** min_two = get_min_two(node_arr, max_idx);
+    // Find two lowest value nodes in node arr, w/ len number giving max len,
+    // and their indicies
+    Node **min_two = get_min_two(node_arr, max_idx);
     // Create node w/ the two lowest as children
     uint64_t count = min_two[0]->count + min_two[1]->count;
 
-    Node* N = init_node(min_two[0], min_two[1], 0, count, 0);
+    Node *N = init_node(min_two[0], min_two[1], 0, count, 0);
     free(min_two);
 
-    // remove the original two lowest value nodes, insert new node, decrease len number
-    // we can remove the nodes since we can free the node mem in the tree, not in the arr
+    // remove the original two lowest value nodes, insert new node, decrease len
+    // number we can remove the nodes since we can free the node mem in the
+    // tree, not in the arr
     node_arr[max_idx - 2] = N;
     max_idx--;
     fin_node = N;
@@ -196,12 +195,12 @@ Node* build_tree(uint64_t* freq_arr) {
  * the code which defines the new node's position in
  * the tree.
  */
-void reconstruct_tree(Node* N, uint8_t token, uint8_t code_len, uint64_t code) {
-  Node* cur_node = N;
+void reconstruct_tree(Node *N, uint8_t token, uint8_t code_len, uint64_t code) {
+  Node *cur_node = N;
   for (unsigned int i = 64; i > 64 - code_len; i--) {
     bool is_leaf = i == (64 - code_len + 1);
     uint8_t leaf_token = is_leaf ? token : 0;
-    uint64_t shift = (uint64_t) 1 << (i - 1);
+    uint64_t shift = (uint64_t)1 << (i - 1);
     if ((code & shift) == shift) {
       if (cur_node->r == NULL)
         cur_node->r = init_node(NULL, NULL, leaf_token, 0, is_leaf);
@@ -216,51 +215,48 @@ void reconstruct_tree(Node* N, uint8_t token, uint8_t code_len, uint64_t code) {
 
 // Recursive call to get tree depth
 // use cnt = 0 at top level
-unsigned int _tree_depth(Node* N, unsigned int cnt) {
-  if (N == NULL) return cnt;
-  return fmax(
-      _tree_depth(N->l, cnt + 1),
-      _tree_depth(N->r, cnt + 1));
+unsigned int _tree_depth(Node *N, unsigned int cnt) {
+  if (N == NULL)
+    return cnt;
+  return fmax(_tree_depth(N->l, cnt + 1), _tree_depth(N->r, cnt + 1));
 }
 
-unsigned int tree_depth(Node* N) {
-  return _tree_depth(N, 0) - 1;
-}
+unsigned int tree_depth(Node *N) { return _tree_depth(N, 0) - 1; }
 
-void _traverse(Node* N, CharCode* cur_cmprs, CharCode** write_table) {
+void _traverse(Node *N, CharCode *cur_cmprs, CharCode **write_table) {
   if (N->is_leaf) {
     cur_cmprs->token = N->token;
     write_table[N->token] = cur_cmprs;
     return;
   }
-  CharCode* left_charcode = init_charcode(
+  CharCode *left_charcode = init_charcode(
       cur_cmprs->code | ((uint64_t)0 << (63 - cur_cmprs->code_len)),
-      cur_cmprs->code_len + 1,
-      0);
-  CharCode* right_charcode = init_charcode(
+      cur_cmprs->code_len + 1, 0);
+  CharCode *right_charcode = init_charcode(
       cur_cmprs->code | ((uint64_t)1 << (63 - cur_cmprs->code_len)),
-      cur_cmprs->code_len + 1,
-      0);
+      cur_cmprs->code_len + 1, 0);
   free(cur_cmprs);
   _traverse(N->l, left_charcode, write_table);
   _traverse(N->r, right_charcode, write_table);
 }
 
-CharCode** traverse_tree(Node* N) {
-  char* s = "failed to allocate CharCode array in traverse_tree\n";
-  CharCode** ccarr = (CharCode**) safecalloc(TOKEN_SET_LEN, sizeof(CharCode*), s);
-  CharCode* first_charcode = init_charcode(0, 0, 0);
+CharCode **traverse_tree(Node *N) {
+  char *s = "failed to allocate CharCode array in traverse_tree\n";
+  CharCode **ccarr =
+      (CharCode **)safecalloc(TOKEN_SET_LEN, sizeof(CharCode *), s);
+  CharCode *first_charcode = init_charcode(0, 0, 0);
   _traverse(N, first_charcode, ccarr);
   return ccarr;
 }
 
-void free_charcodes(CharCode** C) {
+void free_charcodes(CharCode **C) {
   for (int i = 0; i < TOKEN_SET_LEN; i++) {
-    if (C[i]) free(C[i]);
+    if (C[i])
+      free(C[i]);
   }
 }
 
-bool trees_equal(Node* N1, Node* N2) {
+bool trees_equal(Node *N1, Node *N2) {
   if ((N1 == NULL) && (N2 == NULL))
     return 1;
   else if ((N1 == NULL) != (N2 == NULL))
@@ -271,14 +267,15 @@ bool trees_equal(Node* N1, Node* N2) {
 }
 
 // i love recursion
-void free_tree(Node* N) {
-  if (N == NULL) return;
+void free_tree(Node *N) {
+  if (N == NULL)
+    return;
   free_tree(N->r);
   free_tree(N->l);
   free(N);
 }
 
-void write_charcode(FILE* outfile, CharCode* c) {
+void write_charcode(FILE *outfile, CharCode *c) {
   /* write to file <1:char><1:num bits in tree code><x:tree code>
    * to current position in outfile
    */
@@ -289,7 +286,7 @@ void write_charcode(FILE* outfile, CharCode* c) {
   fwrite(&code, num_code_bytes, 1, outfile);
 }
 
-void encode(FILE* infile, FILE* outfile, CharCode** write_table) {
+void encode(FILE *infile, FILE *outfile, CharCode **write_table) {
   // FILE FORMAT
   //  HEADER - tells decoder how to read file
   //    consists of
@@ -309,10 +306,12 @@ void encode(FILE* infile, FILE* outfile, CharCode** write_table) {
   // Write to the file in chunks of 8 kb (8 bytes per u64, 1024 of)
   // write_chunk is the chunk of mem that gets written each time.
   // chunk_idx is the index of the write_chunk array that is being written to.
-  // int_idx is the index of the uint64_t (given by write_chunk[chunk_idx]) that hasn't
+  // int_idx is the index of the uint64_t (given by write_chunk[chunk_idx]) that
+  // hasn't
   //   been written to yet.
-  char* s = "failed initializing write_chunk in encode\n";
-  uint64_t* write_chunk = (uint64_t*)safecalloc(WRITE_CHUNK_SIZE, sizeof(uint64_t), s);
+  char *s = "failed initializing write_chunk in encode\n";
+  uint64_t *write_chunk =
+      (uint64_t *)safecalloc(WRITE_CHUNK_SIZE, sizeof(uint64_t), s);
   uint64_t chunk_idx = 0;
   int8_t int_idx = 0;
 
@@ -334,7 +333,7 @@ void encode(FILE* infile, FILE* outfile, CharCode** write_table) {
   fread(&c, 1, 1, infile);
 
   s = "failed initializing char arr in char freqs\n";
-  uint8_t* read_chunk = safecalloc(READ_CHUNK_SIZE, 1, s);
+  uint8_t *read_chunk = safecalloc(READ_CHUNK_SIZE, 1, s);
 
   size_t read_idx = 0;
   size_t bytes_read = fread(read_chunk, 1, READ_CHUNK_SIZE, infile);
@@ -356,7 +355,7 @@ void encode(FILE* infile, FILE* outfile, CharCode** write_table) {
       if (infile_pos == flen) {
         // if we are out of chars and here, we write and are finished!
         // set bytes to big endian order
-        for (unsigned int i = 0; i < chunk_idx+1; i++)
+        for (unsigned int i = 0; i < chunk_idx + 1; i++)
           write_chunk[i] = htonll(write_chunk[i]);
 
         // doing simple math to reduce number of redundant bits to less than 8
@@ -364,7 +363,8 @@ void encode(FILE* infile, FILE* outfile, CharCode** write_table) {
         uint8_t full_junk_bytes = NUM_BYTES(final_u64_num_junk_bits) - 1;
         uint8_t num_bytes_to_write = 8 - full_junk_bytes;
         tail_padding_zeros = final_u64_num_junk_bits - 8 * full_junk_bytes;
-        uint64_t tail_chunk = write_chunk[chunk_idx];;
+        uint64_t tail_chunk = write_chunk[chunk_idx];
+        ;
 
         fwrite(write_chunk, sizeof(uint64_t), chunk_idx, outfile);
         fwrite(&tail_chunk, 1, num_bytes_to_write, outfile);
@@ -388,7 +388,7 @@ void encode(FILE* infile, FILE* outfile, CharCode** write_table) {
         write_chunk[i] = htonll(write_chunk[i]);
 
       fwrite(write_chunk, sizeof(uint64_t), WRITE_CHUNK_SIZE, outfile);
-      memset(write_chunk, 0, WRITE_CHUNK_SIZE*sizeof(*write_chunk));
+      memset(write_chunk, 0, WRITE_CHUNK_SIZE * sizeof(*write_chunk));
       chunk_idx = 0;
     }
   }
@@ -396,7 +396,7 @@ void encode(FILE* infile, FILE* outfile, CharCode** write_table) {
   free(write_chunk);
 }
 
-void decode(FILE* encoded_fh, FILE* decoded_fh) {
+void decode(FILE *encoded_fh, FILE *decoded_fh) {
   // hop to end of file to get file len, padding zeros
   // offset of -1 so we can read the tail padding too.
   // once we are done, return it to start of file.
@@ -413,7 +413,7 @@ void decode(FILE* encoded_fh, FILE* decoded_fh) {
   // read symbols
   uint8_t token, code_len;
   uint64_t code;
-  Node* root = init_node(NULL, NULL, 0, 0, 0);
+  Node *root = init_node(NULL, NULL, 0, 0, 0);
   for (uint16_t i = 0; i < num_symbols; i++) {
     // symbol token
     fread(&token, 1, 1, encoded_fh);
@@ -433,11 +433,11 @@ void decode(FILE* encoded_fh, FILE* decoded_fh) {
   // read actual file data
   uint8_t byte;
   uint8_t byte_valid_bits;
-  char* s = "failed creating write chunk\n";
-  uint8_t* write_chunk = safecalloc(WRITE_CHUNK_SIZE, 1, s);
+  char *s = "failed creating write chunk\n";
+  uint8_t *write_chunk = safecalloc(WRITE_CHUNK_SIZE, 1, s);
   size_t write_idx = 0;
 
-  Node* N = root;
+  Node *N = root;
   uint64_t cur_file_pos = ftell(encoded_fh);
   for (; cur_file_pos < end_pos - 1; cur_file_pos++) {
     // read byte
@@ -469,22 +469,27 @@ void decode(FILE* encoded_fh, FILE* decoded_fh) {
 
 int main(int argc, char *argv[]) {
   bool encode_file = 1;
-  char** outfile_name = NULL;
-  char* fin = NULL;
+  char **outfile_name = NULL;
+  char *fin = NULL;
 
   int opt;
   while (optind < argc) {
     if ((opt = getopt(argc, argv, "df:")) != -1) {
       switch (opt) {
-        case 'd': encode_file = 0; break;
-        case 'f': outfile_name = &optarg; break;
-        case '?': if (optopt == 'f') {
-                    fprintf (stderr, "Option -f requires an argument.\n");
-                    exit(1);
-                  }
-        default:
-                  fprintf(stderr, "Usage: %s [-df] [file...]\n", argv[0]);
-                  exit(1);
+      case 'd':
+        encode_file = 0;
+        break;
+      case 'f':
+        outfile_name = &optarg;
+        break;
+      case '?':
+        if (optopt == 'f') {
+          fprintf(stderr, "Option -f requires an argument.\n");
+          exit(1);
+        }
+      default:
+        fprintf(stderr, "Usage: %s [-df] [file...]\n", argv[0]);
+        exit(1);
       }
     } else {
       fin = argv[optind];
@@ -505,7 +510,7 @@ int main(int argc, char *argv[]) {
   }
 
   if (encode_file) {
-    char* encoded_file = strcat(fin, ".pine");
+    char *encoded_file = strcat(fin, ".pine");
 
     FILE *outfile;
     outfile = fopen(encoded_file, "w");
@@ -514,9 +519,9 @@ int main(int argc, char *argv[]) {
       exit(1);
     }
 
-    uint64_t* freq_arr = calculate_char_freqs(infile);
-    Node* tree = build_tree(freq_arr);
-    CharCode** C = traverse_tree(tree);
+    uint64_t *freq_arr = calculate_char_freqs(infile);
+    Node *tree = build_tree(freq_arr);
+    CharCode **C = traverse_tree(tree);
 
     encode(infile, outfile, C);
 
@@ -534,7 +539,7 @@ int main(int argc, char *argv[]) {
         *outfile_name = strcat("decoded_", fin);
     }
 
-    FILE* outfile;
+    FILE *outfile;
     outfile = fopen(*outfile_name, "w");
     if (!outfile) {
       fprintf(stderr, "failed to open %s\n", *outfile_name);

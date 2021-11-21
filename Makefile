@@ -7,6 +7,9 @@ prf:
 debug:
 	@clang -Wall -Wextra -g -O0 -o huff chuff.c
 
+format:
+	@clang-format -i chuff.c
+
 .PHONY: clean
 clean:
 	@# force to supress complaints when there aren't .pine files.
