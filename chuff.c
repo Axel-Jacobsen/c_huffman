@@ -229,13 +229,17 @@ void _traverse(Node *N, CharCode *cur_cmprs, CharCode **write_table) {
     write_table[N->token] = cur_cmprs;
     return;
   }
+
   CharCode *left_charcode = init_charcode(
       cur_cmprs->code | ((uint64_t)0 << (63 - cur_cmprs->code_len)),
       cur_cmprs->code_len + 1, 0);
+
   CharCode *right_charcode = init_charcode(
       cur_cmprs->code | ((uint64_t)1 << (63 - cur_cmprs->code_len)),
       cur_cmprs->code_len + 1, 0);
+
   free(cur_cmprs);
+
   _traverse(N->l, left_charcode, write_table);
   _traverse(N->r, right_charcode, write_table);
 }
@@ -335,6 +339,9 @@ void encode(FILE *infile, FILE *outfile, CharCode **write_table) {
   // 5. Once there are no more bytes to read, we write the last write chunks
   //    and the number of ragged bits at the end which we can ignore while
   //    decoding.
+  // 
+  // Really, the for(;;) loop is a state machine. I should probably make a
+  // diagram for it.
   fseek(infile, 0L, SEEK_END);
   uint64_t flen = ftell(infile);
   fseek(infile, 0L, SEEK_SET);
@@ -368,7 +375,6 @@ void encode(FILE *infile, FILE *outfile, CharCode **write_table) {
   size_t read_idx = 0;
   size_t bytes_read = fread(read_chunk, 1, READ_CHUNK_SIZE, infile);
 
-  uint8_t tail_padding_zeros = 0;
   uint64_t code = write_table[c]->code;
   uint64_t code_len = write_table[c]->code_len;
 
@@ -392,11 +398,12 @@ void encode(FILE *infile, FILE *outfile, CharCode **write_table) {
         uint8_t final_u64_num_junk_bits = 64 - int_idx;
         uint8_t full_junk_bytes = NUM_BYTES(final_u64_num_junk_bits) - 1;
         uint8_t num_bytes_to_write = 8 - full_junk_bytes;
-        tail_padding_zeros = final_u64_num_junk_bits - 8 * full_junk_bytes;
+        uint8_t tail_padding_zeros = final_u64_num_junk_bits - 8 * full_junk_bytes;
         uint64_t tail_chunk = write_chunk[chunk_idx];
 
         fwrite(write_chunk, sizeof(uint64_t), chunk_idx, outfile);
         fwrite(&tail_chunk, 1, num_bytes_to_write, outfile);
+        fwrite(&tail_padding_zeros, sizeof(uint8_t), 1, outfile);
         break;
       }
       // load a char here
@@ -421,7 +428,6 @@ void encode(FILE *infile, FILE *outfile, CharCode **write_table) {
       chunk_idx = 0;
     }
   }
-  fwrite(&tail_padding_zeros, sizeof(uint8_t), 1, outfile);
   free(write_chunk);
 }
 
