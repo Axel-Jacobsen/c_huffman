@@ -123,8 +123,8 @@ void swap_idxs(Node **node_arr, uint64_t lidx, uint64_t slidx,
   node_arr[lidx] = node_arr[max_idx - 1];
   node_arr[max_idx - 1] = ldx_tmp;
   // swap 2
-  if (slidx ==
-      max_idx - 1) // slidx has been swapped by code above, so now in lidx
+  if (slidx == max_idx - 1)
+    // slidx has been swapped by code above, so now in lidx
     slidx = lidx;
   Node *slidx_tmp = node_arr[slidx];
   node_arr[slidx] = node_arr[max_idx - 2];
@@ -364,7 +364,6 @@ void encode(FILE *infile, FILE *outfile, CharCode **write_table) {
         uint8_t num_bytes_to_write = 8 - full_junk_bytes;
         tail_padding_zeros = final_u64_num_junk_bits - 8 * full_junk_bytes;
         uint64_t tail_chunk = write_chunk[chunk_idx];
-        ;
 
         fwrite(write_chunk, sizeof(uint64_t), chunk_idx, outfile);
         fwrite(&tail_chunk, 1, num_bytes_to_write, outfile);
