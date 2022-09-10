@@ -339,7 +339,7 @@ void encode(FILE *infile, FILE *outfile, CharCode **write_table) {
   // 5. Once there are no more bytes to read, we write the last write chunks
   //    and the number of ragged bits at the end which we can ignore while
   //    decoding.
-  // 
+  //
   // Really, the for(;;) loop is a state machine. I should probably make a
   // diagram for it.
   fseek(infile, 0L, SEEK_END);
@@ -373,7 +373,7 @@ void encode(FILE *infile, FILE *outfile, CharCode **write_table) {
   uint8_t *read_chunk = safecalloc(READ_CHUNK_SIZE, 1, s);
 
   size_t read_idx = 0;
-  size_t bytes_read = fread(read_chunk, 1, READ_CHUNK_SIZE, infile);
+  fread(read_chunk, 1, READ_CHUNK_SIZE, infile);
 
   uint64_t code = write_table[c]->code;
   uint64_t code_len = write_table[c]->code_len;
@@ -398,7 +398,8 @@ void encode(FILE *infile, FILE *outfile, CharCode **write_table) {
         uint8_t final_u64_num_junk_bits = 64 - int_idx;
         uint8_t full_junk_bytes = NUM_BYTES(final_u64_num_junk_bits) - 1;
         uint8_t num_bytes_to_write = 8 - full_junk_bytes;
-        uint8_t tail_padding_zeros = final_u64_num_junk_bits - 8 * full_junk_bytes;
+        uint8_t tail_padding_zeros =
+            final_u64_num_junk_bits - 8 * full_junk_bytes;
         uint64_t tail_chunk = write_chunk[chunk_idx];
 
         fwrite(write_chunk, sizeof(uint64_t), chunk_idx, outfile);
@@ -409,7 +410,7 @@ void encode(FILE *infile, FILE *outfile, CharCode **write_table) {
       // load a char here
       if (read_idx == READ_CHUNK_SIZE) {
         read_idx = 0;
-        bytes_read = fread(read_chunk, 1, READ_CHUNK_SIZE, infile);
+        fread(read_chunk, 1, READ_CHUNK_SIZE, infile);
       }
       c = read_chunk[read_idx];
       code = write_table[c]->code;
