@@ -336,7 +336,7 @@ void encode(FILE *infile, FILE *outfile, CharCode **write_table) {
   uint8_t *read_chunk = safecalloc(READ_CHUNK_SIZE, 1, s);
 
   size_t read_idx = 0;
-  size_t bytes_read = fread(read_chunk, 1, READ_CHUNK_SIZE, infile);
+  fread(read_chunk, 1, READ_CHUNK_SIZE, infile);
 
   uint8_t tail_padding_zeros = 0;
   uint64_t code = write_table[c]->code;
@@ -372,7 +372,7 @@ void encode(FILE *infile, FILE *outfile, CharCode **write_table) {
       // load a char here
       if (read_idx == READ_CHUNK_SIZE) {
         read_idx = 0;
-        bytes_read = fread(read_chunk, 1, READ_CHUNK_SIZE, infile);
+        fread(read_chunk, 1, READ_CHUNK_SIZE, infile);
       }
       c = read_chunk[read_idx];
       code = write_table[c]->code;
