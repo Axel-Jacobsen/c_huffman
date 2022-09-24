@@ -229,13 +229,17 @@ void _traverse(Node *N, CharCode *cur_cmprs, CharCode **write_table) {
     write_table[N->token] = cur_cmprs;
     return;
   }
+
   CharCode *left_charcode = init_charcode(
       cur_cmprs->code | ((uint64_t)0 << (63 - cur_cmprs->code_len)),
       cur_cmprs->code_len + 1, 0);
+
   CharCode *right_charcode = init_charcode(
       cur_cmprs->code | ((uint64_t)1 << (63 - cur_cmprs->code_len)),
       cur_cmprs->code_len + 1, 0);
+
   free(cur_cmprs);
+
   _traverse(N->l, left_charcode, write_table);
   _traverse(N->r, right_charcode, write_table);
 }
@@ -298,17 +302,50 @@ void encode(FILE *infile, FILE *outfile, CharCode **write_table) {
   //  CONTENTS - encoded symbols in file
   //  TAIL
   //    <1 byte: number of bits padding end of file>
+  //
   // MSB of byte is the first instruction (i.e. left/right instruction)
-  fseek(infile, 0L, SEEK_END);
-  uint64_t flen = ftell(infile);
-  fseek(infile, 0L, SEEK_SET);
-
   // Write to the file in chunks of 8 kb (8 bytes per u64, 1024 of)
   // write_chunk is the chunk of mem that gets written each time.
   // chunk_idx is the index of the write_chunk array that is being written to.
   // int_idx is the index of the uint64_t (given by write_chunk[chunk_idx]) that
-  // hasn't
-  //   been written to yet.
+  // hasn't been written to yet.
+  //
+  //  e.g. if the write_array has length 4, chunk_idx = 1 and int_idx = 2 is
+  //
+  // |       u64       |     u64         |       u64       |       u64       |
+  // | . . . . . . . . | . . . . . . . . | . . . . . . . . | . . . . . . . . |
+  //                         ^
+  //                         | int_idx = 2
+  //
+  //                   ^^^^^^^^^^^^^^^^^^^
+  //                      chunk_idx = 1
+  //
+  // The for(;;) loop below simply handles this data format, and writes it to
+  // the output file. Since each encoded character is represented by a number
+  // of bits that is not necessarily a multiple of 8, we have to do a lot of
+  // bit shifting to get everyting stacked together nicely. The algorithm is
+  // quite simple, though (ignoring some details):
+  //
+  // 1. Read in the next byte from the input file.
+  // 2. Find the byte's corresponding CharCode C in the write_table
+  // 3. Write C.code to write_chunk[chunk_idx] at position ind_idx
+  //    by shifting C.code into position
+  //    3.a If ind_idx + C.code_len > 64, then we write
+  //        int_idx + C.code_len - 64 of the last bits of C.code to
+  //        the next chunk_idx
+  // 4. If chunk_idx == WRITE_CHUNK_LEN - 1, we write the write_chunk to the
+  //    output file, set write_chunk to 0s, and set chunk_idx = int_idx = 0.
+  //    Hop back to 1
+  // 5. Once there are no more bytes to read, we write the last write chunks
+  //    and the number of ragged bits at the end which we can ignore while
+  //    decoding.
+  //
+  // Really, the for(;;) loop is a state machine. I should probably make a
+  // diagram for it.
+  fseek(infile, 0L, SEEK_END);
+  uint64_t flen = ftell(infile);
+  fseek(infile, 0L, SEEK_SET);
+
   char *s = "failed initializing write_chunk in encode\n";
   uint64_t *write_chunk =
       (uint64_t *)safecalloc(WRITE_CHUNK_SIZE, sizeof(uint64_t), s);
@@ -338,7 +375,6 @@ void encode(FILE *infile, FILE *outfile, CharCode **write_table) {
   size_t read_idx = 0;
   fread(read_chunk, 1, READ_CHUNK_SIZE, infile);
 
-  uint8_t tail_padding_zeros = 0;
   uint64_t code = write_table[c]->code;
   uint64_t code_len = write_table[c]->code_len;
 
@@ -362,11 +398,13 @@ void encode(FILE *infile, FILE *outfile, CharCode **write_table) {
         uint8_t final_u64_num_junk_bits = 64 - int_idx;
         uint8_t full_junk_bytes = NUM_BYTES(final_u64_num_junk_bits) - 1;
         uint8_t num_bytes_to_write = 8 - full_junk_bytes;
-        tail_padding_zeros = final_u64_num_junk_bits - 8 * full_junk_bytes;
+        uint8_t tail_padding_zeros =
+            final_u64_num_junk_bits - 8 * full_junk_bytes;
         uint64_t tail_chunk = write_chunk[chunk_idx];
 
         fwrite(write_chunk, sizeof(uint64_t), chunk_idx, outfile);
         fwrite(&tail_chunk, 1, num_bytes_to_write, outfile);
+        fwrite(&tail_padding_zeros, sizeof(uint8_t), 1, outfile);
         break;
       }
       // load a char here
@@ -391,7 +429,6 @@ void encode(FILE *infile, FILE *outfile, CharCode **write_table) {
       chunk_idx = 0;
     }
   }
-  fwrite(&tail_padding_zeros, sizeof(uint8_t), 1, outfile);
   free(write_chunk);
 }
 
