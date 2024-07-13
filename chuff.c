@@ -503,6 +503,12 @@ void decode(FILE *encoded_fh, FILE *decoded_fh) {
   free_tree(root);
 }
 
+void help(char *argv[]) {
+  fprintf(stderr, "Usage: %s [-d] [-f output filename] [file...]\n", argv[0]);
+  fprintf(stderr, "  -d decode\n");
+  fprintf(stderr, "  -f output file name\n");
+}
+
 int main(int argc, char *argv[]) {
   bool encode_file = 1;
   char **outfile_name = NULL;
@@ -524,7 +530,7 @@ int main(int argc, char *argv[]) {
           exit(1);
         }
       default:
-        fprintf(stderr, "Usage: %s [-df] [file...]\n", argv[0]);
+        help(argv);
         exit(1);
       }
     } else {
@@ -534,7 +540,7 @@ int main(int argc, char *argv[]) {
   }
 
   if (fin == NULL) {
-    fprintf(stderr, "Usage: %s [-df] [file...]\n", argv[0]);
+    help(argv);
     exit(1);
   }
 
